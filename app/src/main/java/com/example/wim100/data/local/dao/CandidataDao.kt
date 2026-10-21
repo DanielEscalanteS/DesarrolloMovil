@@ -1,0 +1,34 @@
+package com.example.wim100.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.example.wim100.model.Candidata
+import com.example.wim100.model.EstadoCandidatura
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface CandidataDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertar(candidata: Candidata): Long
+
+    // Flow significa que esta lista se actualizará SOLA en la pantalla si alguien agrega una candidata
+    @Query("SELECT * FROM candidatas ORDER BY fechaRegistro DESC")
+    fun observarTodas(): Flow<List<Candidata>>
+
+    @Query("SELECT * FROM candidatas WHERE id = :id")
+    fun observarPorId(id: Long): Flow<Candidata?>
+
+    @Query("SELECT * FROM candidatas WHERE id = :id")
+    suspend fun obtenerPorId(id: Long): Candidata?
+
+    @Query("UPDATE candidatas SET estado = :estado WHERE id = :id")
+    suspend fun actualizarEstado(id: Long, estado: EstadoCandidatura)
+
+    @Query("SELECT COUNT(*) FROM candidatas")
+    suspend fun contar(): Int
+
+    @Query("SELECT COUNT(*) FROM candidatas WHERE LOWER(correo) = LOWER(:correo)")
+    suspend fun contarPorCorreo(correo: String): Int
+}
