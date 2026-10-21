@@ -1,4 +1,4 @@
-package com.example.appsemestral
+package com.example.wim100
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
