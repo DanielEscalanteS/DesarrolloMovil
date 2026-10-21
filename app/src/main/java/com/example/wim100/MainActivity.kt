@@ -1,47 +1,21 @@
-package com.example.wim100
+package com.example.appsemestral
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.wim100.ui.theme.WIM100Theme
+import androidx.fragment.app.FragmentActivity
+import com.example.wim100.ui.WimApp
+import com.example.wim100.ui.theme.AppSemestralTheme
 
-class MainActivity : ComponentActivity() {
+/** FragmentActivity (y no ComponentActivity) porque BiometricPrompt la necesita. */
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            WIM100Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+            AppSemestralTheme {
+                WimApp()
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    WIM100Theme {
-        Greeting("Android")
     }
 }
