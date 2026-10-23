@@ -45,13 +45,15 @@ object CandidataValidator {
     }
 
     fun validarLinkedin(valor: String): ValidationResult {
-        if (!valor.contains("linkedin.com/in/")) return ValidationResult.error("Ingresa un enlace de LinkedIn válido")
+        if (!Regex("^https://(www\\.)?linkedin\\.com/in/[A-Za-z0-9-]+/?$", RegexOption.IGNORE_CASE).matches(valor.trim())) return ValidationResult.error("Ingresa un enlace de LinkedIn válido")
         return ValidationResult.Valido
     }
 
     fun validarCv(nombreArchivo: String?, tamanoBytes: Long?): ValidationResult {
         if (nombreArchivo == null || nombreArchivo.trim().isEmpty()) return ValidationResult.error("Falta adjuntar el PDF")
         if (!nombreArchivo.endsWith(".pdf", ignoreCase = true)) return ValidationResult.error("Debe ser PDF")
+        if (tamanoBytes == null || tamanoBytes <= 0) return ValidationResult.error("No se pudo verificar el tamaño del PDF")
+        if (tamanoBytes > 5L * 1024 * 1024) return ValidationResult.error("El PDF supera los 5 MB")
         return ValidationResult.Valido
     }
 

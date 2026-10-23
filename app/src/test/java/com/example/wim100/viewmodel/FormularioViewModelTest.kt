@@ -5,7 +5,7 @@ import org.junit.Test
 class FormularioViewModelTest {
     @Test
     fun estadoInicialEstaVacio() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         val estado = viewModel.uiState.value
         assertEquals("", estado.nombre)
         assertEquals("", estado.correo)
@@ -14,7 +14,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun actualizarNombreCambiaEstado() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
         assertEquals(
             "Johaquin",
@@ -23,7 +23,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun actualizarCorreoCambiaEstado() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarCorreo("usuario@example.com")
         assertEquals(
             "usuario@example.com",
@@ -32,7 +32,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun actualizarTelefonoCambiaEstado() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarTelefono("912345678")
         assertEquals(
             "912345678",
@@ -41,7 +41,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun formularioVacioEsInvalido() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         val resultado = viewModel.validarFormulario()
         assertFalse(resultado)
         assertTrue(viewModel.uiState.value.errores.hayErrores)
@@ -49,7 +49,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun formularioCompletoEsValido() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
         viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
@@ -60,7 +60,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun corregirDatosActualizaErrores() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
 
         viewModel.validarFormulario()
 
@@ -75,7 +75,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun modificarFormularioValidoDetectaError() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
         viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
@@ -86,7 +86,7 @@ class FormularioViewModelTest {
     }
     @Test
     fun limpiarFormularioRestableceEstado() {
-        val viewModel = FormularioViewModel()
+        val viewModel = crearFormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
         viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
@@ -96,5 +96,35 @@ class FormularioViewModelTest {
             FormularioUiState(),
             viewModel.uiState.value
         )
+    }
+    @Test
+    fun datosPersonalesValidosNoBastanParaEnviarPostulacion() {
+        val vm = crearFormularioViewModel()
+        vm.actualizarNombre("Persona Ficticia")
+        vm.actualizarCorreo("persona@example.com")
+        vm.actualizarTelefono("912345678")
+        assertTrue(vm.validarFormulario())
+        assertFalse(vm.validarPostulacion())
+        assertNotNull(vm.uiState.value.errores.cv)
+        assertNotNull(vm.uiState.value.errores.area)
+        assertNull(vm.uiState.value.idGuardado)
+    }
+
+    @Test
+    fun postulacionCompletaSeValidaYCorregirCvActualizaError() {
+        val vm = crearFormularioViewModel()
+        vm.actualizarNombre("Persona Ficticia")
+        vm.actualizarCorreo("persona@example.com")
+        vm.actualizarTelefono("912345678")
+        vm.actualizarArea("Seguridad defensiva (Blue Team)")
+        vm.actualizarAnios("2")
+        vm.actualizarResumen("Experiencia ficticia suficiente para probar el formulario académico.")
+        vm.actualizarLinkedin("https://www.linkedin.com/in/persona-ficticia")
+        vm.actualizarCv("file:///demo.pdf", "demo.pdf", 6L * 1024 * 1024)
+        assertFalse(vm.validarPostulacion())
+        assertNotNull(vm.uiState.value.errores.cv)
+        vm.actualizarCv("file:///demo.pdf", "demo.pdf", 1024L)
+        assertTrue(vm.uiState.value.formularioValido)
+        assertNull(vm.uiState.value.errores.cv)
     }
 }

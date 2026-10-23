@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
+import com.example.wim100.model.RegistroHistorial
 import com.example.wim100.model.Candidata
 import com.example.wim100.model.EstadoCandidatura
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +14,16 @@ import kotlinx.coroutines.flow.Flow
 interface CandidataDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertar(candidata: Candidata): Long
+
+    @Insert
+    suspend fun insertarHistorial(registro: RegistroHistorial): Long
+
+    @Transaction
+    suspend fun insertarConHistorial(candidata: Candidata, registro: RegistroHistorial): Long {
+        val id = insertar(candidata)
+        insertarHistorial(registro.copy(candidataId = id))
+        return id
+    }
 
     // Flow significa que esta lista se actualizará SOLA en la pantalla si alguien agrega una candidata
     @Query("SELECT * FROM candidatas ORDER BY fechaRegistro DESC")
