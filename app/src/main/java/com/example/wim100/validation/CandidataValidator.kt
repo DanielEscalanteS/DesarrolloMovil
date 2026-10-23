@@ -2,29 +2,31 @@ package com.example.wim100.validation
 
 object CandidataValidator {
 
-    fun validarNombre(valor: String): ValidationResult = when {
-        valor.isBlank() -> ValidationResult.error("El nombre es obligatorio")
-        valor.trim().length < 3 -> ValidationResult.error("El nombre debe tener al menos 3 caracteres")
-        else -> ValidationResult.Valido
+    fun validarNombre(valor: String): ValidationResult {
+        val texto = valor.trim()
+        if (texto.isEmpty()) return ValidationResult.error("El nombre es obligatorio")
+        if (texto.length < 3) return ValidationResult.error("Mínimo 3 letras")
+        return ValidationResult.Valido
     }
 
     fun validarCorreo(valor: String): ValidationResult {
         val texto = valor.trim()
-        val formato = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-        return when {
-            texto.isEmpty() -> ValidationResult.error("El correo es obligatorio")
-            !formato.matches(texto) -> ValidationResult.error("Ingresa un correo electrónico válido")
-            texto.substringAfter("@").lowercase() !in setOf("ejemplo.cl", "example.com") ->
-                ValidationResult.error("Usa un correo ficticio (ej: @ejemplo.cl)")
-            else -> ValidationResult.Valido
+        if (texto.isEmpty()) return ValidationResult.error("El correo es obligatorio")
+        if (!texto.contains("@")) return ValidationResult.error("Falta el @")
+        val formatoCorreo = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+        if (!formatoCorreo.matches(texto)) return ValidationResult.error("Ingresa un correo electrónico válido")
+        if (!texto.lowercase().endsWith("@ejemplo.cl") && !texto.lowercase().endsWith("@example.com")) {
+            return ValidationResult.error("Usa un correo ficticio (ej: @ejemplo.cl)")
         }
+        return ValidationResult.Valido
     }
 
-    fun validarTelefono(valor: String): ValidationResult = when {
-        valor.isBlank() -> ValidationResult.error("El teléfono es obligatorio")
-        valor.any { !it.isDigit() && it !in " +-()" } -> ValidationResult.error("Ingresa un teléfono válido")
-        valor.count { it.isDigit() } !in 8..15 -> ValidationResult.error("El teléfono debe tener entre 8 y 15 dígitos")
-        else -> ValidationResult.Valido
+    fun validarTelefono(valor: String): ValidationResult {
+        if (valor.trim().isEmpty()) return ValidationResult.error("El teléfono es obligatorio")
+        val numero = valor.filter { it.isDigit() }
+        if (valor.any { !it.isDigit() && it !in " +-()" }) return ValidationResult.error("Ingresa un teléfono válido")
+        if (numero.length !in 8..15) return ValidationResult.error("El teléfono debe tener entre 8 y 15 dígitos")
+        return ValidationResult.Valido
     }
 
     fun validarArea(valor: String?): ValidationResult {
@@ -45,7 +47,9 @@ object CandidataValidator {
     }
 
     fun validarLinkedin(valor: String): ValidationResult {
-        if (!Regex("^https://(www\\.)?linkedin\\.com/in/[A-Za-z0-9-]+/?$", RegexOption.IGNORE_CASE).matches(valor.trim())) return ValidationResult.error("Ingresa un enlace de LinkedIn válido")
+        if (!valor.contains("linkedin.com/in/")) return ValidationResult.error("Ingresa un enlace de LinkedIn válido")
+        val formatoLinkedin = Regex("^https://(www\\.)?linkedin\\.com/in/[A-Za-z0-9-]+/?$", RegexOption.IGNORE_CASE)
+        if (!formatoLinkedin.matches(valor.trim())) return ValidationResult.error("Ingresa un enlace de LinkedIn válido")
         return ValidationResult.Valido
     }
 

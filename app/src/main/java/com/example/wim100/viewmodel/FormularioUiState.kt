@@ -32,6 +32,10 @@ data class ErroresFormulario(
     val hayErrores: Boolean
         get() = nombre != null ||
                 correo != null ||
-                telefono != null || area != null || aniosExperiencia != null ||
-                resumenExperiencia != null || linkedinUrl != null || cv != null
+                telefono != null ||
+                area != null ||
+                aniosExperiencia != null ||
+                resumenExperiencia != null ||
+                linkedinUrl != null ||
+                cv != null
 }

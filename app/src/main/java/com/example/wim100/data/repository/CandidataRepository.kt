@@ -27,13 +27,16 @@ class CandidataRepository(
     suspend fun registrar(candidata: Candidata): Long {
         val normalizada = candidata.copy(correo = candidata.correo.trim().lowercase())
         require(!existeCorreo(normalizada.correo)) { "Ya existe una postulación con este correo" }
-        return try {
-            dao.insertarConHistorial(normalizada, RegistroHistorial(
+        try {
+            // Avisamos al historial que alguien registró una candidata
+            val registro = RegistroHistorial(
                 candidataId = null,
                 accion = Acciones.REGISTRO,
                 detalle = "Se registró a ${normalizada.nombre}",
                 usuario = normalizada.registradaPor
-            ))
+            )
+            val idGenerado = dao.insertarConHistorial(normalizada, registro)
+            return idGenerado
         } catch (e: SQLiteConstraintException) {
             if (existeCorreo(normalizada.correo)) {
                 throw IllegalArgumentException("Ya existe una postulación con este correo", e)
