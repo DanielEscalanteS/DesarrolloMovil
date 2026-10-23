@@ -30,7 +30,6 @@ fun WimApp() {
                     Button(onClick = { navController.navigate("postulacion") }, modifier = Modifier.fillMaxWidth()) { Text("Quiero postular") }
                     OutlinedButton(onClick = { navController.navigate("candidatas") }, modifier = Modifier.fillMaxWidth()) { Text("Ver postulaciones") }
                     Spacer(Modifier.height(12.dp))
-                    Text("Demostración académica con datos ficticios. Ambas vistas usan la misma base local.", style = MaterialTheme.typography.bodySmall)
                 }
             }
             composable("postulacion") {
