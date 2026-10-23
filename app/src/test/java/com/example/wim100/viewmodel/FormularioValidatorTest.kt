@@ -32,7 +32,7 @@ class FormularioValidatorTest {
     @Test
     fun correoValidoNoTieneErrores() {
         val resultado = FormularioValidator.validarCorreo(
-            "usuario@gmail.com"
+            "usuario@example.com"
         )
         assertNull(resultado)
     }
@@ -55,7 +55,7 @@ class FormularioValidatorTest {
     fun formularioCompletoEsValido() {
         val errores = FormularioValidator.validarFormulario(
             nombre = "Johaquin",
-            correo = "usuario@gmail.com",
+            correo = "usuario@example.com",
             telefono = "912345678"
         )
         assertFalse(errores.hayErrores)
@@ -68,5 +68,19 @@ class FormularioValidatorTest {
             telefono = ""
         )
         assertTrue(errores.hayErrores)
+    }
+    @Test
+    fun correoRealNoSeAceptaEnElMvpAcademico() {
+        assertNotNull(FormularioValidator.validarCorreo("usuario@gmail.com"))
+    }
+
+    @Test
+    fun correoFicticioAceptaEspaciosExternosYDominioEnMayusculas() {
+        assertNull(FormularioValidator.validarCorreo(" usuario@EXAMPLE.COM "))
+    }
+
+    @Test
+    fun telefonoConLetrasNoSeAceptaAunqueTengaSuficientesDigitos() {
+        assertNotNull(FormularioValidator.validarTelefono("abc912345678"))
     }
 }

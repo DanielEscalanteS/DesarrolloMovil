@@ -24,9 +24,9 @@ class FormularioViewModelTest {
     @Test
     fun actualizarCorreoCambiaEstado() {
         val viewModel = FormularioViewModel()
-        viewModel.actualizarCorreo("usuario@gmail.com")
+        viewModel.actualizarCorreo("usuario@example.com")
         assertEquals(
-            "usuario@gmail.com",
+            "usuario@example.com",
             viewModel.uiState.value.correo
         )
     }
@@ -51,7 +51,7 @@ class FormularioViewModelTest {
     fun formularioCompletoEsValido() {
         val viewModel = FormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
-        viewModel.actualizarCorreo("usuario@gmail.com")
+        viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
         val resultado = viewModel.validarFormulario()
         assertTrue(resultado)
@@ -67,7 +67,7 @@ class FormularioViewModelTest {
         assertTrue(viewModel.uiState.value.errores.hayErrores)
 
         viewModel.actualizarNombre("Johaquin")
-        viewModel.actualizarCorreo("usuario@gmail.com")
+        viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
 
         assertFalse(viewModel.uiState.value.errores.hayErrores)
@@ -77,7 +77,7 @@ class FormularioViewModelTest {
     fun modificarFormularioValidoDetectaError() {
         val viewModel = FormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
-        viewModel.actualizarCorreo("usuario@gmail.com")
+        viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
         viewModel.validarFormulario()
         viewModel.actualizarCorreo("correo-invalido")
@@ -88,7 +88,7 @@ class FormularioViewModelTest {
     fun limpiarFormularioRestableceEstado() {
         val viewModel = FormularioViewModel()
         viewModel.actualizarNombre("Johaquin")
-        viewModel.actualizarCorreo("usuario@gmail.com")
+        viewModel.actualizarCorreo("usuario@example.com")
         viewModel.actualizarTelefono("912345678")
         viewModel.validarFormulario()
         viewModel.limpiarFormulario()
