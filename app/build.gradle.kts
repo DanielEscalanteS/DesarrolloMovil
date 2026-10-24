@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.appsemestral"
+    namespace = "com.example.wim100"
     compileSdk = 37
 
     defaultConfig {
