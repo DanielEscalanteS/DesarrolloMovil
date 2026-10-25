@@ -25,7 +25,7 @@ interface CandidataDao {
         return id
     }
 
-    // Flow significa que esta lista se actualizará SOLA en la pantalla si alguien agrega una candidata
+    // Flow (para que la lista se actualice sola en la pantalla si alguien agrega una candidata)
     @Query("SELECT * FROM candidatas ORDER BY fechaRegistro DESC")
     fun observarTodas(): Flow<List<Candidata>>
 

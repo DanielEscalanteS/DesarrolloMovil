@@ -28,7 +28,7 @@ class CandidataRepository(
         val normalizada = candidata.copy(correo = candidata.correo.trim().lowercase())
         require(!existeCorreo(normalizada.correo)) { "Ya existe una postulación con este correo" }
         try {
-            // Avisamos al historial que alguien registró una candidata
+            // Avisa al historial que alguien registró una candidata
             val registro = RegistroHistorial(
                 candidataId = null,
                 accion = Acciones.REGISTRO,

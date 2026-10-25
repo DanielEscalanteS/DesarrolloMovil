@@ -30,7 +30,7 @@ data class PuntajeCriterio(
     val observacion: String
 )
 
-// Esta clase extra no es una tabla, sirve para pedirle datos ordenados a la BD
+// Esta clase extra sirve para pedirle datos ordenados a la base de datos temporalmente
 data class DetallePuntaje(
     val evaluacionId: Long,
     val criterioNombre: String,

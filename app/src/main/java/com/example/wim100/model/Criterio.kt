@@ -8,6 +8,6 @@ data class Criterio(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nombre: String,
     val descripcion: String,
-    val peso: Int, // Porcentaje (los 5 suman 100)
+    val peso: Int, // Porcentaje (los 5 criterios suman los 100 totales)
     val orden: Int
 )

@@ -12,10 +12,10 @@ import androidx.room.PrimaryKey
             entity = Candidata::class,
             parentColumns = ["id"],
             childColumns = ["candidataId"],
-            onDelete = ForeignKey.CASCADE // Si borras la candidata, se borra su evaluación
+            onDelete = ForeignKey.CASCADE // Si se borra la candidata, se borra su evaluación
         )
     ],
-    // Esto asegura que una evaluadora no califique 2 veces a la misma persona
+    // Verifica que una evaluadora no califique 2 veces a la misma persona
     indices = [Index(value = ["candidataId", "evaluadoraClave"], unique = true)]
 )
 data class Evaluacion(
@@ -28,9 +28,9 @@ data class Evaluacion(
     val fecha: Long = System.currentTimeMillis()
 ) {
     companion object {
-        const val MINIMO_PARA_CONSOLIDAR = 2
+        const val MINIMO_PARA_CONSOLIDAR = 1
 
-        // "  AnA   PérEz " se convierte en "ana pérez" para evitar trucos
+        // "  AnA   PérEz " se convierte en "ana pérez" para evitar duplicados
         fun normalizarClave(nombre: String): String =
             nombre.trim().lowercase().replace(Regex("\\s+"), " ")
     }
