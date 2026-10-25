@@ -51,12 +51,14 @@ fun FortalezasEvaluacion(criterios: List<Criterio>, puntajes: List<PuntajeCriter
 
 @Composable
 private fun GrupoCriterios(titulo: String, criterios: List<String>, icono: ImageVector, color: Color) {
+    if (criterios.isEmpty()) return
+
     Surface(Modifier.fillMaxWidth(), color = color.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp)) {
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Icon(icono, contentDescription = null, tint = color)
             Column(Modifier.weight(1f)) {
                 Text(titulo, color = color, style = MaterialTheme.typography.labelLarge)
-                Text(criterios.joinToString(" · ").ifEmpty { "Sin criterios en este nivel" }, style = MaterialTheme.typography.bodyMedium)
+                Text(criterios.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
