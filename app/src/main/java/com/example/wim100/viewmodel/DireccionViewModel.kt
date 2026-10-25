@@ -5,6 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.wim100.data.repository.CandidataRepository
 import com.example.wim100.data.repository.EvaluacionRepository
 import com.example.wim100.model.EstadoCandidatura
+import com.example.wim100.model.Sesion
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -15,8 +21,23 @@ class DireccionViewModel(
     private val candidataRepository: CandidataRepository
 ) : ViewModel() {
 
+    private val _guardando = MutableStateFlow(false)
+    val guardando = _guardando.asStateFlow()
+    private val _mensaje = MutableStateFlow<String?>(null)
+    val mensaje = _mensaje.asStateFlow()
+    private val _cargando = MutableStateFlow(true)
+    val cargando = _cargando.asStateFlow()
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+
     // Se conecta al Flow del DAO que trae el ranking
     val rankingConsolidado = evaluacionRepository.observarConsolidado()
+        .onEach { _cargando.value = false }
+        .catch {
+            _cargando.value = false
+            _error.value = "No se pudieron consultar los resultados"
+            emit(emptyList())
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -24,9 +45,20 @@ class DireccionViewModel(
         )
 
     // Función para que el Director presione "Seleccionada" o "No seleccionada"
-    fun resolverCandidatura(candidataId: Long, nuevoEstado: EstadoCandidatura, nombreDirector: String) {
+    fun resolverCandidatura(candidataId: Long, nuevoEstado: EstadoCandidatura, sesion: Sesion) {
+        if (_guardando.value) return
+        _guardando.value = true
         viewModelScope.launch {
-            candidataRepository.resolver(candidataId, nuevoEstado, nombreDirector)
+            try {
+                candidataRepository.resolver(candidataId, nuevoEstado, sesion)
+                _mensaje.value = "Resolución guardada"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _mensaje.value = e.message ?: "No se pudo guardar la resolución"
+            } finally {
+                _guardando.value = false
+            }
         }
     }
 }

@@ -4,6 +4,9 @@ import com.example.wim100.data.local.dao.CandidataDao
 import android.database.sqlite.SQLiteConstraintException
 import com.example.wim100.model.RegistroHistorial
 import com.example.wim100.model.Acciones
+import com.example.wim100.model.Sesion
+import com.example.wim100.model.Rol
+import com.example.wim100.model.Evaluacion
 import com.example.wim100.model.Candidata
 import com.example.wim100.model.EstadoCandidatura
 import kotlinx.coroutines.flow.Flow
@@ -45,13 +48,18 @@ class CandidataRepository(
         }
     }
 
-    suspend fun resolver(id: Long, estado: EstadoCandidatura, usuario: String) {
-        dao.actualizarEstado(id, estado)
-        historial.registrar(
-            candidataId = id,
-            accion = Acciones.RESOLUCION,
-            detalle = "Candidatura marcada como ${estado.etiqueta}",
-            usuario = usuario
+    suspend fun resolver(id: Long, estado: EstadoCandidatura, sesion: Sesion) {
+        require(sesion.rol == Rol.DIRECCION) { "Solo Dirección puede resolver candidaturas" }
+        require(estado.estaResuelta) { "Selecciona una resolución válida" }
+        dao.resolverConHistorial(
+            id, estado,
+            RegistroHistorial(
+                candidataId = id,
+                accion = Acciones.RESOLUCION,
+                detalle = "Candidatura marcada como ${estado.etiqueta}",
+                usuario = sesion.nombre
+            ),
+            Evaluacion.MINIMO_PARA_CONSOLIDAR
         )
     }
 }

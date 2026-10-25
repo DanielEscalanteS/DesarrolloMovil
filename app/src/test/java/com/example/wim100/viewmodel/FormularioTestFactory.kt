@@ -17,6 +17,8 @@ internal fun crearFormularioViewModel(): FormularioViewModel {
         override fun observarPorId(id: Long): Flow<Candidata?> = flowOf(null)
         override suspend fun obtenerPorId(id: Long): Candidata? = null
         override suspend fun actualizarEstado(id: Long, estado: EstadoCandidatura) = Unit
+        override suspend fun resolverSiEvaluada(id: Long, nuevoEstado: EstadoCandidatura,
+            estadoActual: EstadoCandidatura, minimo: Int): Int = 0
         override suspend fun contar(): Int = 0
         override suspend fun contarPorCorreo(correo: String): Int = 0
     }

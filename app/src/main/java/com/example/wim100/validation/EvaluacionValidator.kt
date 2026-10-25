@@ -22,6 +22,7 @@ object EvaluacionValidator {
     }
 
     fun validarObservacionGeneral(texto: String): ValidationResult {
+        if (texto.trim().length > OBSERVACION_GENERAL_MAX) return ValidationResult.error("Máximo $OBSERVACION_GENERAL_MAX caracteres")
         if (texto.trim().length < 20) return ValidationResult.error("Mínimo 20 caracteres")
         return ValidationResult.Valido
     }

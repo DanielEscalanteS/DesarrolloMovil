@@ -1,6 +1,8 @@
 package com.example.wim100.ui.screens
 
 import android.content.Intent
+import androidx.core.content.FileProvider
+import java.io.File
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -31,6 +33,8 @@ fun CandidatasScreen(
 
         if (s.cargando) {
             CircularProgressIndicator()
+        } else if (s.error != null) {
+            Text(s.error.orEmpty(), color = MaterialTheme.colorScheme.error)
         } else if (s.candidatas.isEmpty()) {
             Text("Todavía no hay postulaciones.")
         } else {
@@ -60,13 +64,19 @@ fun CandidatasScreen(
                                 if (candidata.cvUri != null) {
                                     OutlinedButton(onClick = {
                                         try {
+                                            val guardada = Uri.parse(candidata.cvUri)
+                                            val uriCompartida = if (guardada.scheme == "file") {
+                                                FileProvider.getUriForFile(context, "${context.packageName}.archivos", File(checkNotNull(guardada.path)))
+                                            } else guardada
                                             val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(Uri.parse(candidata.cvUri), "application/pdf")
+                                                setDataAndType(uriCompartida, "application/pdf")
                                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
                                             context.startActivity(intent)
+                                        } catch (e: android.content.ActivityNotFoundException) {
+                                            Toast.makeText(context, "Instala una aplicación para abrir PDF", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "No hay una aplicación instalada para abrir el PDF", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "No se pudo abrir el CV. Revisa que el archivo exista.", Toast.LENGTH_SHORT).show()
                                         }
                                     }) {
                                         Text("Ver CV")
