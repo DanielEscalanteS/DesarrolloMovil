@@ -43,4 +43,20 @@ interface CandidataDao {
 
     @Query("SELECT COUNT(*) FROM candidatas WHERE LOWER(correo) = LOWER(:correo)")
     suspend fun contarPorCorreo(correo: String): Int
+
+    @Query("""
+        UPDATE candidatas SET estado = :nuevoEstado
+        WHERE id = :id AND estado = :estadoActual
+        AND (SELECT COUNT(*) FROM evaluaciones WHERE candidataId = :id) >= :minimo
+    """)
+    suspend fun resolverSiEvaluada(id: Long, nuevoEstado: EstadoCandidatura,
+        estadoActual: EstadoCandidatura, minimo: Int): Int
+
+    @Transaction
+    suspend fun resolverConHistorial(id: Long, nuevoEstado: EstadoCandidatura,
+        registro: RegistroHistorial, minimo: Int) {
+        val actualizadas = resolverSiEvaluada(id, nuevoEstado, EstadoCandidatura.EVALUADA, minimo)
+        check(actualizadas == 1) { "La candidatura debe estar evaluada y no resuelta" }
+        insertarHistorial(registro)
+    }
 }

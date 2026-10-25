@@ -32,6 +32,7 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
     // Carga desde la base de datos al abrir la pantalla
     fun cargarCriterios() {
         viewModelScope.launch {
+            try {
             // 1. Inyectamos los criterios oficiales de WIM100 si la base de datos está vacía
             val criteriosOficiales = listOf(
                 Criterio(nombre = "Trayectoria", descripcion = "Años y relevancia de experiencia.", peso = 25, orden = 1),
@@ -45,6 +46,8 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
             // 2. Se leen y se muestran en pantalla
             val lista = repository.obtenerCriterios()
             _uiState.update { it.copy(criterios = lista) }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _uiState.update { it.copy(errorGeneral = "No se pudieron cargar los criterios") } }
         }
     }
 
@@ -66,7 +69,21 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
 
     // Valida y guarda en la base de datos (Room)
     fun guardarEvaluacion(candidataId: Long, nombreEvaluadora: String) {
+        if (_uiState.value.guardando || _uiState.value.finalizadoConExito) return
         val estado = _uiState.value
+        if (estado.criterios.isEmpty()) {
+            _uiState.update { it.copy(errorGeneral = "Espera a que carguen los criterios") }
+            return
+        }
+        for (criterio in estado.criterios) {
+            val nota = EvaluacionValidator.validarPuntaje(estado.puntajes[criterio.id])
+            val observacion = EvaluacionValidator.validarObservacionCriterio(
+                estado.puntajes[criterio.id], estado.observaciones[criterio.id].orEmpty())
+            if (!nota.esValido || !observacion.esValido) {
+                _uiState.update { it.copy(errorGeneral = "${criterio.nombre}: ${nota.mensaje ?: observacion.mensaje}") }
+                return
+            }
+        }
 
         // 1. Verificar si la observación general no está vacía
         val validacionGeneral = EvaluacionValidator.validarObservacionGeneral(estado.observacionGeneral)
@@ -86,7 +103,8 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
                     observacionGeneral = estado.observacionGeneral
                 )
                 _uiState.update { it.copy(guardando = false, finalizadoConExito = true) }
-            } catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
                 _uiState.update { it.copy(guardando = false, errorGeneral = e.message) }
             }
         }

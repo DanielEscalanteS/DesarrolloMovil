@@ -3,6 +3,7 @@ package com.example.wim100.data.repository
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import com.example.wim100.data.local.WimDatabase
+import com.example.wim100.validation.EvaluacionValidator
 import com.example.wim100.model.Acciones
 import com.example.wim100.model.CalculadoraPuntaje
 import com.example.wim100.model.Criterio
@@ -55,6 +56,13 @@ class EvaluacionRepository(
             // withTransaction (si algo de aquí falla, no se guarda nada a medias)
             return db.withTransaction {
 
+                val candidata = candidataDao.obtenerPorId(candidataId)
+                    ?: error("La candidatura no existe")
+                check(!candidata.estado.estaResuelta) { "La candidatura ya fue resuelta" }
+                require(evaluadora.trim().length >= 3) { "Identifica a la evaluadora" }
+                val validacionGeneral = EvaluacionValidator.validarObservacionGeneral(observacionGeneral)
+                require(validacionGeneral.esValido) { validacionGeneral.mensaje.orEmpty() }
+
                 // 1. Verifica que no sea duplicada
                 if (evaluacionDao.contarPorEvaluadora(candidataId, clave) > 0) {
                     throw EvaluacionDuplicadaException("Ya evaluaste a esta candidata")
@@ -62,6 +70,14 @@ class EvaluacionRepository(
 
                 // 2. Calcula la nota
                 val criterios = criterioDao.obtenerTodos()
+                check(criterios.isNotEmpty()) { "Espera a que se carguen los criterios" }
+                for (criterio in criterios) {
+                    val nota = EvaluacionValidator.validarPuntaje(puntajes[criterio.id])
+                    require(nota.esValido) { "${criterio.nombre}: ${nota.mensaje}" }
+                    val observacion = EvaluacionValidator.validarObservacionCriterio(
+                        puntajes[criterio.id], observaciones[criterio.id].orEmpty())
+                    require(observacion.esValido) { "${criterio.nombre}: ${observacion.mensaje}" }
+                }
                 val total = CalculadoraPuntaje.calcular(criterios, puntajes)
 
                 // 3. Guarda la evaluación
