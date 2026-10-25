@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.wim100.data.repository.EvaluacionRepository
 import com.example.wim100.model.CalculadoraPuntaje
 import com.example.wim100.model.Criterio
+import com.example.wim100.model.CriteriosDemostracion
+import com.example.wim100.model.Sesion
+import com.example.wim100.model.Rol
+import com.example.wim100.model.Evaluacion
 import com.example.wim100.validation.EvaluacionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +22,11 @@ data class EvaluacionUiState(
     val observaciones: Map<Long, String> = emptyMap(),
     val observacionGeneral: String = "",
     val errorGeneral: String? = null,
+    val cargando: Boolean = true,
+    val puedeGuardar: Boolean = false,
+    val editando: Boolean = false,
+    val revision: Int = 0,
+    val candidataNombre: String = "",
     val guardando: Boolean = false,
     val finalizadoConExito: Boolean = false
 ) {
@@ -28,26 +37,39 @@ data class EvaluacionUiState(
 class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewModel() {
     private val _uiState = MutableStateFlow(EvaluacionUiState())
     val uiState: StateFlow<EvaluacionUiState> = _uiState.asStateFlow()
+    private var candidataCargada: Long? = null
 
     // Carga desde la base de datos al abrir la pantalla
-    fun cargarCriterios() {
+    fun cargarCriterios(candidataId: Long, sesion: Sesion) {
+        if (candidataCargada == candidataId) return
+        candidataCargada = candidataId
         viewModelScope.launch {
             try {
             // 1. Inyectamos los criterios oficiales de WIM100 si la base de datos está vacía
-            val criteriosOficiales = listOf(
-                Criterio(nombre = "Trayectoria", descripcion = "Años y relevancia de experiencia.", peso = 25, orden = 1),
-                Criterio(nombre = "Conocimientos", descripcion = "Certificaciones y educación.", peso = 25, orden = 2),
-                Criterio(nombre = "Liderazgo", descripcion = "Habilidades de gestión y equipo.", peso = 20, orden = 3),
-                Criterio(nombre = "Visión", descripcion = "Perspectiva estratégica en ciberseguridad.", peso = 15, orden = 4),
-                Criterio(nombre = "Comunicación", descripcion = "Claridad en la entrega de ideas.", peso = 15, orden = 5)
-            )
+            val criteriosOficiales = CriteriosDemostracion.lista
             repository.asegurarCriterios(criteriosOficiales)
 
             // 2. Se leen y se muestran en pantalla
             val lista = repository.obtenerCriterios()
-            _uiState.update { it.copy(criterios = lista) }
-            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) { _uiState.update { it.copy(errorGeneral = "No se pudieron cargar los criterios") } }
+            val ficha = repository.obtenerFicha(candidataId) ?: error("La candidatura no existe")
+            check(sesion.rol == Rol.EVALUADORA) { "Acceso reservado a Evaluadora" }
+            check(!ficha.candidata.estado.estaResuelta) { "Dirección ya resolvió esta candidatura" }
+            val anterior = ficha.evaluaciones.singleOrNull()
+            if (anterior != null) {
+                check(anterior.evaluacion.evaluadoraClave == Evaluacion.normalizarClave(sesion.nombre)) {
+                    "Solo ${anterior.evaluacion.evaluadora} puede editar esta evaluación"
+                }
+            }
+            _uiState.update { it.copy(criterios = lista, cargando = false, puedeGuardar = true,
+                candidataNombre = ficha.candidata.nombre, editando = anterior != null,
+                revision = anterior?.evaluacion?.revision ?: 0,
+                puntajes = anterior?.puntajes?.associate { p -> p.criterioId to p.puntaje }.orEmpty(),
+                observaciones = anterior?.puntajes?.associate { p -> p.criterioId to p.observacion }.orEmpty(),
+                observacionGeneral = anterior?.evaluacion?.observacionGeneral.orEmpty()) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) { _uiState.update { it.copy(cargando = false, puedeGuardar = false,
+                errorGeneral = e.message ?: "No se pudo cargar la evaluación") } }
         }
     }
 
@@ -68,8 +90,8 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
     }
 
     // Valida y guarda en la base de datos (Room)
-    fun guardarEvaluacion(candidataId: Long, nombreEvaluadora: String) {
-        if (_uiState.value.guardando || _uiState.value.finalizadoConExito) return
+    fun guardarEvaluacion(candidataId: Long, sesion: Sesion) {
+        if (_uiState.value.guardando || _uiState.value.finalizadoConExito || !_uiState.value.puedeGuardar) return
         val estado = _uiState.value
         if (estado.criterios.isEmpty()) {
             _uiState.update { it.copy(errorGeneral = "Espera a que carguen los criterios") }
@@ -95,16 +117,20 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
         _uiState.update { it.copy(guardando = true, errorGeneral = null) }
         viewModelScope.launch {
             try {
-                repository.registrar(
+                if (estado.editando) {
+                    repository.actualizar(candidataId, sesion, estado.revision, estado.puntajes,
+                        estado.observaciones, estado.observacionGeneral)
+                } else repository.registrar(
                     candidataId = candidataId,
-                    evaluadora = nombreEvaluadora,
+                    evaluadora = sesion.nombre,
                     puntajes = estado.puntajes,
                     observaciones = estado.observaciones,
                     observacionGeneral = estado.observacionGeneral
                 )
                 _uiState.update { it.copy(guardando = false, finalizadoConExito = true) }
-            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (e: Exception) {
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 _uiState.update { it.copy(guardando = false, errorGeneral = e.message) }
             }
         }

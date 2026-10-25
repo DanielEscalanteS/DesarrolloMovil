@@ -44,6 +44,15 @@ interface CandidataDao {
     @Query("SELECT COUNT(*) FROM candidatas WHERE LOWER(correo) = LOWER(:correo)")
     suspend fun contarPorCorreo(correo: String): Int
 
+    @Query("DELETE FROM candidatas WHERE id = :id")
+    suspend fun eliminar(id: Long): Int
+
+    @Query("SELECT COUNT(*) FROM candidatas WHERE cvUri = :uri")
+    suspend fun contarPorCvUri(uri: String): Int
+
+    @Query("UPDATE candidatas SET area = :area WHERE correo = :correo AND registradaPor = :responsable")
+    suspend fun actualizarAreaEjemplo(correo: String, responsable: String, area: String)
+
     @Query("""
         UPDATE candidatas SET estado = :nuevoEstado
         WHERE id = :id AND estado = :estadoActual

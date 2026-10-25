@@ -1,0 +1,10 @@
+CREATE TABLE candidatas (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, nombre TEXT NOT NULL, correo TEXT NOT NULL, telefono TEXT NOT NULL, area TEXT NOT NULL, aniosExperiencia INTEGER NOT NULL, resumenExperiencia TEXT NOT NULL, linkedinUrl TEXT NOT NULL, cvUri TEXT, cvNombre TEXT, estado TEXT NOT NULL, fechaRegistro INTEGER NOT NULL, registradaPor TEXT NOT NULL);
+CREATE UNIQUE INDEX index_candidatas_correo ON candidatas(correo);
+CREATE TABLE criterios (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, nombre TEXT NOT NULL, descripcion TEXT NOT NULL, peso INTEGER NOT NULL, orden INTEGER NOT NULL);
+CREATE TABLE evaluaciones (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, candidataId INTEGER NOT NULL, evaluadora TEXT NOT NULL, evaluadoraClave TEXT NOT NULL, puntajeTotal REAL NOT NULL, observacionGeneral TEXT NOT NULL, fecha INTEGER NOT NULL, FOREIGN KEY(candidataId) REFERENCES candidatas(id) ON DELETE CASCADE);
+CREATE UNIQUE INDEX index_evaluaciones_candidataId_evaluadoraClave ON evaluaciones(candidataId, evaluadoraClave);
+CREATE TABLE puntajes_criterio (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, evaluacionId INTEGER NOT NULL, criterioId INTEGER NOT NULL, puntaje INTEGER NOT NULL, observacion TEXT NOT NULL, FOREIGN KEY(evaluacionId) REFERENCES evaluaciones(id) ON DELETE CASCADE, FOREIGN KEY(criterioId) REFERENCES criterios(id));
+CREATE INDEX index_puntajes_criterio_evaluacionId ON puntajes_criterio(evaluacionId);
+CREATE INDEX index_puntajes_criterio_criterioId ON puntajes_criterio(criterioId);
+CREATE TABLE historial (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, candidataId INTEGER, accion TEXT NOT NULL, detalle TEXT NOT NULL, usuario TEXT NOT NULL, fecha INTEGER NOT NULL);
+CREATE INDEX index_historial_candidataId ON historial(candidataId);

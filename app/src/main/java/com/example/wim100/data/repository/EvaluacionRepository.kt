@@ -3,6 +3,7 @@ package com.example.wim100.data.repository
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import com.example.wim100.data.local.WimDatabase
+import com.example.wim100.data.local.CandidataConEvaluaciones
 import com.example.wim100.validation.EvaluacionValidator
 import com.example.wim100.model.Acciones
 import com.example.wim100.model.CalculadoraPuntaje
@@ -12,6 +13,8 @@ import com.example.wim100.model.EstadoCandidatura
 import com.example.wim100.model.Evaluacion
 import com.example.wim100.model.PuntajeCriterio
 import com.example.wim100.model.ResultadoConsolidado
+import com.example.wim100.model.Rol
+import com.example.wim100.model.Sesion
 import kotlinx.coroutines.flow.Flow
 
 class EvaluacionDuplicadaException(mensaje: String) : Exception(mensaje)
@@ -37,6 +40,11 @@ class EvaluacionRepository(
     fun observarPorCandidata(candidataId: Long): Flow<List<Evaluacion>> = evaluacionDao.observarPorCandidata(candidataId)
     fun observarDetallePuntajes(candidataId: Long): Flow<List<DetallePuntaje>> = evaluacionDao.observarDetallePuntajes(candidataId)
     fun observarConsolidado(): Flow<List<ResultadoConsolidado>> = evaluacionDao.observarConsolidado()
+
+    fun observarTodas(): Flow<List<Evaluacion>> = evaluacionDao.observarTodas()
+    fun observarFicha(candidataId: Long): Flow<CandidataConEvaluaciones?> = evaluacionDao.observarFicha(candidataId)
+    suspend fun obtenerFicha(candidataId: Long): CandidataConEvaluaciones? = evaluacionDao.obtenerFicha(candidataId)
+    fun observarFichas(): Flow<List<CandidataConEvaluaciones>> = evaluacionDao.observarFichas()
 
     suspend fun yaEvaluo(candidataId: Long, evaluadora: String): Boolean {
         val clave = Evaluacion.normalizarClave(evaluadora)
@@ -64,8 +72,8 @@ class EvaluacionRepository(
                 require(validacionGeneral.esValido) { validacionGeneral.mensaje.orEmpty() }
 
                 // 1. Verifica que no sea duplicada
-                if (evaluacionDao.contarPorEvaluadora(candidataId, clave) > 0) {
-                    throw EvaluacionDuplicadaException("Ya evaluaste a esta candidata")
+                if (evaluacionDao.contarPorCandidata(candidataId) > 0) {
+                    throw EvaluacionDuplicadaException("Esta candidata ya tiene una evaluación. Su responsable puede editarla.")
                 }
 
                 // 2. Calcula la nota
@@ -102,7 +110,7 @@ class EvaluacionRepository(
                 }
                 evaluacionDao.insertarPuntajes(listaPuntajes)
 
-                // 5. Lo actualiza si la candidata ya tiene 2 notas
+                // 5. Una evaluación completa permite pasar a Evaluada.
                 val cantidadEvaluaciones = evaluacionDao.contarPorCandidata(candidataId)
 
                 val nuevoEstado = if (cantidadEvaluaciones >= Evaluacion.MINIMO_PARA_CONSOLIDAR) {
@@ -121,8 +129,50 @@ class EvaluacionRepository(
             historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "El sistema bloqueó un duplicado", evaluadora)
             throw e
         } catch (e: SQLiteConstraintException) {
+            if (evaluacionDao.contarPorCandidata(candidataId) == 0) throw e
             historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "El sistema bloqueó un duplicado", evaluadora)
-            throw EvaluacionDuplicadaException("Error interno: Ya evaluaste")
+            throw EvaluacionDuplicadaException("Esta candidata ya tiene una evaluación")
         }
+    }
+
+    suspend fun actualizar(
+        candidataId: Long, sesion: Sesion, revisionEsperada: Int,
+        puntajes: Map<Long, Int>, observaciones: Map<Long, String>, observacionGeneral: String
+    ): Double = db.withTransaction {
+        require(sesion.rol == Rol.EVALUADORA) { "Solo la evaluadora responsable puede editar" }
+        val candidata = candidataDao.obtenerPorId(candidataId) ?: error("La candidatura no existe")
+        check(!candidata.estado.estaResuelta) { "Dirección ya resolvió esta candidatura" }
+        val anterior = evaluacionDao.obtenerPorCandidata(candidataId) ?: error("La evaluación no existe")
+        require(anterior.evaluadoraClave == Evaluacion.normalizarClave(sesion.nombre)) {
+            "Solo ${anterior.evaluadora} puede modificar esta evaluación"
+        }
+        check(anterior.revision == revisionEsperada) { "La evaluación cambió. Vuelve a abrirla antes de editar." }
+        val general = EvaluacionValidator.validarObservacionGeneral(observacionGeneral)
+        require(general.esValido) { general.mensaje.orEmpty() }
+        val criterios = criterioDao.obtenerTodos()
+        check(criterios.isNotEmpty()) { "No se cargaron los criterios" }
+        for (criterio in criterios) {
+            val nota = EvaluacionValidator.validarPuntaje(puntajes[criterio.id])
+            require(nota.esValido) { "${criterio.nombre}: ${nota.mensaje}" }
+            val observacion = EvaluacionValidator.validarObservacionCriterio(puntajes[criterio.id], observaciones[criterio.id].orEmpty())
+            require(observacion.esValido) { "${criterio.nombre}: ${observacion.mensaje}" }
+        }
+        val anteriores = evaluacionDao.obtenerPuntajes(anterior.id).associateBy { it.criterioId }
+        val total = CalculadoraPuntaje.calcular(criterios, puntajes)
+        check(evaluacionDao.actualizar(anterior.id, total, observacionGeneral, System.currentTimeMillis(), revisionEsperada) == 1) {
+            "La evaluación cambió. Vuelve a abrirla antes de editar."
+        }
+        evaluacionDao.eliminarPuntajes(anterior.id)
+        evaluacionDao.insertarPuntajes(criterios.map { c ->
+            PuntajeCriterio(evaluacionId = anterior.id, criterioId = c.id,
+                puntaje = checkNotNull(puntajes[c.id]), observacion = observaciones[c.id].orEmpty())
+        })
+        val cambios = criterios.joinToString(" | ") { c ->
+            "${c.nombre}: ${anteriores[c.id]?.puntaje} → ${puntajes[c.id]}. " +
+                "Justificación anterior: ${anteriores[c.id]?.observacion.orEmpty()}. Nueva: ${observaciones[c.id].orEmpty()}"
+        }
+        historial.registrar(candidataId, Acciones.EDICION_EVALUACION,
+            "Total: ${anterior.puntajeTotal} → $total. $cambios. Observación anterior: ${anterior.observacionGeneral}. Nueva: $observacionGeneral", sesion.nombre)
+        total
     }
 }

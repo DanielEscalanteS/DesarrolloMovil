@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
+import com.example.wim100.data.local.CandidataConEvaluaciones
 import com.example.wim100.model.DetallePuntaje
 import com.example.wim100.model.Evaluacion
 import com.example.wim100.model.PuntajeCriterio
@@ -26,6 +28,37 @@ interface EvaluacionDao {
 
     @Query("SELECT * FROM evaluaciones WHERE candidataId = :candidataId ORDER BY fecha DESC")
     fun observarPorCandidata(candidataId: Long): Flow<List<Evaluacion>>
+
+    @Query("SELECT * FROM evaluaciones ORDER BY fecha DESC, id DESC")
+    fun observarTodas(): Flow<List<Evaluacion>>
+
+    @Transaction
+    @Query("SELECT * FROM candidatas WHERE id = :candidataId")
+    fun observarFicha(candidataId: Long): Flow<CandidataConEvaluaciones?>
+
+    @Transaction
+    @Query("SELECT * FROM candidatas WHERE id = :candidataId")
+    suspend fun obtenerFicha(candidataId: Long): CandidataConEvaluaciones?
+
+    @Transaction
+    @Query("SELECT * FROM candidatas ORDER BY nombre")
+    fun observarFichas(): Flow<List<CandidataConEvaluaciones>>
+
+    @Query("SELECT * FROM evaluaciones WHERE candidataId = :candidataId LIMIT 1")
+    suspend fun obtenerPorCandidata(candidataId: Long): Evaluacion?
+
+    @Query("SELECT * FROM puntajes_criterio WHERE evaluacionId = :evaluacionId")
+    suspend fun obtenerPuntajes(evaluacionId: Long): List<PuntajeCriterio>
+
+    @Query("DELETE FROM puntajes_criterio WHERE evaluacionId = :evaluacionId")
+    suspend fun eliminarPuntajes(evaluacionId: Long)
+
+    @Query("""
+        UPDATE evaluaciones SET puntajeTotal = :total, observacionGeneral = :observacion,
+            fechaEdicion = :fecha, revision = revision + 1
+        WHERE id = :id AND revision = :revision
+    """)
+    suspend fun actualizar(id: Long, total: Double, observacion: String, fecha: Long, revision: Int): Int
 
     @Query(
         """

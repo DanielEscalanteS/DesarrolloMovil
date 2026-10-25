@@ -19,6 +19,7 @@ object Acciones {
     const val CIERRE_SESION = "Cierre de sesión"
     const val REGISTRO = "Registro de candidatura"
     const val EVALUACION = "Evaluación registrada"
+    const val EDICION_EVALUACION = "Evaluación modificada"
     const val INTENTO_DUPLICADO = "Intento de evaluación duplicada"
     const val RESOLUCION = "Resolución de candidatura"
     const val CONSULTA_CV = "Consulta de CV"

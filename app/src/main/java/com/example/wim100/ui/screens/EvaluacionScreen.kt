@@ -12,25 +12,35 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wim100.ui.components.CampoFormulario
 import com.example.wim100.viewmodel.EvaluacionViewModel
+import com.example.wim100.model.Sesion
 
 @Composable
 fun EvaluacionScreen(
     candidataId: Long,
-    nombreEvaluadora: String,
+    sesion: Sesion,
     viewModel: EvaluacionViewModel,
     onVolver: () -> Unit
 ) {
     val estado by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.cargarCriterios()
+    LaunchedEffect(candidataId) {
+        viewModel.cargarCriterios(candidataId, sesion)
+    }
+
+    if (estado.cargando || !estado.puedeGuardar) {
+        Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (estado.cargando) CircularProgressIndicator()
+            else Text(estado.errorGeneral ?: "No se puede editar esta evaluación", color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onVolver) { Text("Volver") }
+        }
+        return
     }
 
     if (estado.finalizadoConExito) {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Evaluación Exitosa") },
-            text = { Text("Los puntajes han sido guardados en el registro histórico.") },
+            title = { Text(if (estado.editando) "Cambios guardados" else "Evaluación Exitosa") },
+            text = { Text(if (estado.editando) "La evaluación fue actualizada y la modificación quedó en el historial." else "Los puntajes han sido guardados en el registro histórico.") },
             confirmButton = { TextButton(onClick = onVolver) { Text("Aceptar") } }
         )
     }
@@ -38,6 +48,8 @@ fun EvaluacionScreen(
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         // Cabecera
         Text("Matriz WIM 100", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(estado.candidataNombre, style = MaterialTheme.typography.titleMedium)
+        Text(if (estado.editando) "Editando tu evaluación" else "Evaluadora: ${sesion.nombre}")
         Text(
             text = "Nota ponderada: ${String.format("%.1f", estado.puntajeTotal)} / 100",
             style = MaterialTheme.typography.titleMedium,
@@ -89,12 +101,12 @@ fun EvaluacionScreen(
                         // Solo se muestra el campo si la nota es 1 o 2
                         val notaActual = estado.puntajes[criterio.id]
 
-                        if (notaActual == 1 || notaActual == 2) {
+                        if (notaActual == 1 || notaActual == 2 || estado.observaciones[criterio.id].orEmpty().isNotBlank()) {
                             Spacer(modifier = Modifier.height(16.dp))
                             val textoObservacion = estado.observaciones[criterio.id] ?: ""
                             CampoFormulario(
                                 valor = textoObservacion,
-                                etiqueta = "Justificación (obligatorio con nota 1 o 2)",
+                                etiqueta = if (notaActual == 1 || notaActual == 2) "Justificación (obligatorio con nota 1 o 2)" else "Observación del criterio",
                                 error = null,
                                 onCambio = { viewModel.actualizarObservacion(criterio.id, it) }
                             )
@@ -117,11 +129,11 @@ fun EvaluacionScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = { viewModel.guardarEvaluacion(candidataId, nombreEvaluadora) },
+                    onClick = { viewModel.guardarEvaluacion(candidataId, sesion) },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     enabled = !estado.guardando
                 ) {
-                    Text(if (estado.guardando) "Guardando en Base de Datos..." else "Registrar Evaluación", style = MaterialTheme.typography.titleMedium)
+                    Text(if (estado.guardando) "Guardando en Base de Datos..." else if (estado.editando) "Guardar cambios" else "Registrar Evaluación", style = MaterialTheme.typography.titleMedium)
                 }
 
                 TextButton(onClick = onVolver, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
