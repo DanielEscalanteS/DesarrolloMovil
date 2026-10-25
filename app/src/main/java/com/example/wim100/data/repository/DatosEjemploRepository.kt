@@ -76,8 +76,8 @@ class DatosEjemploRepository(
         }
         val archivoRetirado = retirarCvAnterior(anterior)
         "$creadas candidatas de ejemplo agregadas. Las que ya existían se conservaron." +
-            (if (anterior != null) " Se retiró el registro anterior." else "") +
-            (if (!archivoRetirado) " No se pudo borrar el archivo anterior; su referencia ya fue retirada." else "")
+                (if (anterior != null) " Se retiró el registro anterior." else "") +
+                (if (!archivoRetirado) " No se pudo borrar el archivo anterior; su referencia ya fue retirada." else "")
     }
 
     private fun ejemplo(nombre: String, correo: String, area: String, anios: Int) = Candidata(
@@ -92,20 +92,26 @@ class DatosEjemploRepository(
         val carpeta = File(context.filesDir, "cvs").apply { mkdirs() }
         val archivo = File(carpeta, "ejemplo_${UUID.randomUUID()}.pdf")
         nuevos.add(archivo)
-        PdfDocument().use { documento ->
+        val documento = PdfDocument()
+        try {
             val pagina = documento.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
-            val pincel = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 13f }
-            val lineas = listOf(
-                "CV FICTICIO - SOLO PARA DEMOSTRACION", "", candidata.nombre, candidata.correo,
-                "Área: ${candidata.area}", "Experiencia: ${candidata.aniosExperiencia} años", "",
-                "Perfil de ejemplo para probar postulaciones y evaluaciones WIM100.",
-                "Experiencia simulada en análisis de riesgos y respuesta a incidentes.",
-                "Participación ficticia en equipos y actividades de ciberseguridad.", "",
-                "Este documento no corresponde a una persona ni a un CV real."
-            )
-            lineas.forEachIndexed { indice, texto -> pagina.canvas.drawText(texto, 40f, 60f + indice * 26f, pincel) }
-            documento.finishPage(pagina)
+            try {
+                val pincel = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 13f }
+                val lineas = listOf(
+                    "CV FICTICIO - SOLO PARA DEMOSTRACION", "", candidata.nombre, candidata.correo,
+                    "Área: ${candidata.area}", "Experiencia: ${candidata.aniosExperiencia} años", "",
+                    "Perfil de ejemplo para probar postulaciones y evaluaciones WIM100.",
+                    "Experiencia simulada en análisis de riesgos y respuesta a incidentes.",
+                    "Participación ficticia en equipos y actividades de ciberseguridad.", "",
+                    "Este documento no corresponde a una persona ni a un CV real."
+                )
+                lineas.forEachIndexed { indice, texto -> pagina.canvas.drawText(texto, 40f, 60f + indice * 26f, pincel) }
+            } finally {
+                documento.finishPage(pagina)
+            }
             archivo.outputStream().use { documento.writeTo(it) }
+        } finally {
+            documento.close()
         }
         return archivo
     }
