@@ -1,7 +1,7 @@
+
 package com.example.wim100.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
@@ -26,55 +26,211 @@ fun DetalleEvaluacionesScreen(
     onVolver: () -> Unit
 ) {
     val estado by viewModel.uiState.collectAsStateWithLifecycle()
-    LaunchedEffect(candidataId) { viewModel.cargar(candidataId) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextButton(onClick = onVolver) { Text("Volver") }
-        Text("Detalle de evaluación", style = MaterialTheme.typography.headlineSmall)
-        when {
-            estado.cargando -> CircularProgressIndicator()
-            estado.error != null -> Text(estado.error.orEmpty(), color = MaterialTheme.colorScheme.error)
-            else -> estado.ficha?.let { ficha ->
-                val detalle = ficha.evaluaciones.singleOrNull()
-                val propia = detalle != null && nombreEvaluadora != null &&
-                    detalle.evaluacion.evaluadoraClave == Evaluacion.normalizarClave(nombreEvaluadora)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(ficha.candidata.nombre, style = MaterialTheme.typography.titleLarge)
-                        Text(ficha.candidata.area, style = MaterialTheme.typography.bodyMedium)
-                        Text(ficha.candidata.estado.etiqueta, color = MaterialTheme.colorScheme.primary)
-                    }
-                    if (propia && !ficha.candidata.estado.estaResuelta) {
-                        IconButton(onClick = { onEditar(candidataId) }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar evaluación")
-                        }
-                    }
+    LaunchedEffect(candidataId) {
+        viewModel.cargar(candidataId)
+    }
+
+    // Toda la pantalla utiliza el componente reutilizable
+    PantallaDesplazable {
+
+        // Cabecera desplazable
+        item(key = "cabecera") {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(onClick = onVolver) {
+                    Text("Volver")
                 }
-                if (detalle == null) Text("Esta candidata todavía no tiene una evaluación.")
-                else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                Text(
+                    text = "Detalle de evaluación",
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        }
+
+        when {
+            estado.cargando -> {
+                item {
+                    CircularProgressIndicator()
+                }
+            }
+
+            estado.error != null -> {
+                item {
+                    Text(
+                        text = estado.error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            else -> {
+                val ficha = estado.ficha
+
+                if (ficha == null) {
                     item {
-                        val evaluacion = detalle.evaluacion
-                        val formato = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
-                        Text("Evaluadora: ${evaluacion.evaluadora}" + if (propia) " · Tu evaluación" else "")
-                        Text("Registrada: ${formato.format(Date(evaluacion.fecha))}", style = MaterialTheme.typography.bodySmall)
-                        evaluacion.fechaEdicion?.let { Text("Última edición: ${formato.format(Date(it))}", style = MaterialTheme.typography.bodySmall) }
+                        Text("No se encontró la evaluación.")
                     }
-                    item { ResumenPuntaje(detalle.evaluacion.puntajeTotal) }
-                    item { FortalezasEvaluacion(estado.criterios, detalle.puntajes) }
-                    items(estado.criterios, key = { it.id }) { criterio ->
-                        val puntaje = detalle.puntajes.find { it.criterioId == criterio.id }
-                        OutlinedCard(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("Peso: ${criterio.peso}%", style = MaterialTheme.typography.labelMedium)
-                                BarraNota(criterio.nombre, puntaje?.puntaje, puntaje?.observacion.orEmpty())
+                } else {
+                    val detalle = ficha.evaluaciones.singleOrNull()
+
+                    val propia = detalle != null &&
+                            nombreEvaluadora != null &&
+                            detalle.evaluacion.evaluadoraClave ==
+                            Evaluacion.normalizarClave(nombreEvaluadora)
+
+                    // Información de la candidata
+                    item(key = "candidata") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = ficha.candidata.nombre,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+
+                                Text(
+                                    text = ficha.candidata.area,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+
+                                Text(
+                                    text = ficha.candidata.estado.etiqueta,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            if (
+                                propia &&
+                                !ficha.candidata.estado.estaResuelta
+                            ) {
+                                IconButton(
+                                    onClick = { onEditar(candidataId) }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Edit,
+                                        contentDescription = "Editar evaluación"
+                                    )
+                                }
                             }
                         }
                     }
-                    item {
-                        ElevatedCard(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Observación general", style = MaterialTheme.typography.titleMedium)
-                                Text(detalle.evaluacion.observacionGeneral)
+
+                    if (detalle == null) {
+                        item {
+                            Text(
+                                "Esta candidata todavía no tiene una evaluación."
+                            )
+                        }
+                    } else {
+
+                        // Información de registro
+                        item(key = "registro") {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val evaluacion = detalle.evaluacion
+
+                                val formato =
+                                    DateFormat.getDateTimeInstance(
+                                        DateFormat.SHORT,
+                                        DateFormat.SHORT
+                                    )
+
+                                Text(
+                                    "Evaluadora: ${evaluacion.evaluadora}" +
+                                            if (propia) " · Tu evaluación" else ""
+                                )
+
+                                Text(
+                                    "Registrada: ${
+                                        formato.format(Date(evaluacion.fecha))
+                                    }",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+
+                                evaluacion.fechaEdicion?.let {
+                                    Text(
+                                        "Última edición: ${
+                                            formato.format(Date(it))
+                                        }",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+
+                        // Resumen de puntaje
+                        item(key = "resumen") {
+                            ResumenPuntaje(
+                                detalle.evaluacion.puntajeTotal
+                            )
+                        }
+
+                        // Fortalezas
+                        item(key = "fortalezas") {
+                            FortalezasEvaluacion(
+                                estado.criterios,
+                                detalle.puntajes
+                            )
+                        }
+
+                        // Criterios y calificaciones
+                        items(
+                            items = estado.criterios,
+                            key = { "criterio-${it.id}" }
+                        ) { criterio ->
+
+                            val puntaje = detalle.puntajes.find {
+                                it.criterioId == criterio.id
+                            }
+
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement =
+                                        Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Peso: ${criterio.peso}%",
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+
+                                    BarraNota(
+                                        criterio.nombre,
+                                        puntaje?.puntaje,
+                                        puntaje?.observacion.orEmpty()
+                                    )
+                                }
+                            }
+                        }
+
+                        // Observación general
+                        item(key = "observacion") {
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement =
+                                        Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        "Observación general",
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+
+                                    Text(
+                                        detalle.evaluacion.observacionGeneral
+                                    )
+                                }
                             }
                         }
                     }
