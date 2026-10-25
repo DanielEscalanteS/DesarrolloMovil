@@ -52,19 +52,19 @@ class EvaluacionRepository(
         val clave = Evaluacion.normalizarClave(evaluadora)
 
         try {
-            // withTransaction: Si algo de aquí adentro falla, no se guarda nada a medias
+            // withTransaction (si algo de aquí falla, no se guarda nada a medias)
             return db.withTransaction {
 
-                // 1. Verificamos que no sea duplicada
+                // 1. Verifica que no sea duplicada
                 if (evaluacionDao.contarPorEvaluadora(candidataId, clave) > 0) {
                     throw EvaluacionDuplicadaException("Ya evaluaste a esta candidata")
                 }
 
-                // 2. Calculamos la nota
+                // 2. Calcula la nota
                 val criterios = criterioDao.obtenerTodos()
                 val total = CalculadoraPuntaje.calcular(criterios, puntajes)
 
-                // 3. Guardamos la evaluación
+                // 3. Guarda la evaluación
                 val evaluacionId = evaluacionDao.insertar(
                     Evaluacion(
                         candidataId = candidataId,
@@ -75,7 +75,7 @@ class EvaluacionRepository(
                     )
                 )
 
-                // 4. Guardamos los puntajes 1 a 5 de los criterios
+                // 4. Guarda los puntajes 1 a 5 de los criterios
                 val listaPuntajes = criterios.map { c ->
                     PuntajeCriterio(
                         evaluacionId = evaluacionId,
@@ -86,8 +86,9 @@ class EvaluacionRepository(
                 }
                 evaluacionDao.insertarPuntajes(listaPuntajes)
 
-                // 5. Actualizamos si la candidata ya tiene 2 notas
+                // 5. Lo actualiza si la candidata ya tiene 2 notas
                 val cantidadEvaluaciones = evaluacionDao.contarPorCandidata(candidataId)
+
                 val nuevoEstado = if (cantidadEvaluaciones >= Evaluacion.MINIMO_PARA_CONSOLIDAR) {
                     EstadoCandidatura.EVALUADA
                 } else {
@@ -98,13 +99,13 @@ class EvaluacionRepository(
                 // 6. Registro al historial
                 historial.registrar(candidataId, Acciones.EVALUACION, "Evaluación registrada", evaluadora)
 
-                total // Retornamos la nota final
+                total // Se retorna la nota final
             }
         } catch (e: EvaluacionDuplicadaException) {
-            historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "Sistema bloqueó un duplicado", evaluadora)
+            historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "El sistema bloqueó un duplicado", evaluadora)
             throw e
         } catch (e: SQLiteConstraintException) {
-            historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "Sistema bloqueó un duplicado", evaluadora)
+            historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "El sistema bloqueó un duplicado", evaluadora)
             throw EvaluacionDuplicadaException("Error interno: Ya evaluaste")
         }
     }

@@ -8,11 +8,11 @@ object CalculadoraPuntaje {
         var pesoTotal = 0
         var obtenido = 0
 
-        // Recorremos cada criterio uno por uno
+        // Recorre cada criterio uno por uno
         for (criterio in criterios) {
             pesoTotal += criterio.peso
 
-            // Buscamos la nota. Si no existe, usamos 0
+            // Busca la nota, y si no existe se usa 0 por defecto
             val nota = puntajes[criterio.id] ?: 0
             obtenido += nota * criterio.peso
         }
