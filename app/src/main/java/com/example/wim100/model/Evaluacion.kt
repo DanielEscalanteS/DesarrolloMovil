@@ -1,6 +1,7 @@
 package com.example.wim100.model
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -12,11 +13,12 @@ import androidx.room.PrimaryKey
             entity = Candidata::class,
             parentColumns = ["id"],
             childColumns = ["candidataId"],
-            onDelete = ForeignKey.CASCADE // Si borras la candidata, se borra su evaluación
+            onDelete = ForeignKey.CASCADE // Si se borra la candidata, se borra su evaluación
         )
     ],
-    // Esto asegura que una evaluadora no califique 2 veces a la misma persona
-    indices = [Index(value = ["candidataId", "evaluadoraClave"], unique = true)]
+    // Se conserva el índice anterior y se exige una sola evaluación por candidata.
+    indices = [Index(value = ["candidataId", "evaluadoraClave"], unique = true),
+        Index(value = ["candidataId"], unique = true)]
 )
 data class Evaluacion(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -25,12 +27,14 @@ data class Evaluacion(
     val evaluadoraClave: String,
     val puntajeTotal: Double,
     val observacionGeneral: String,
-    val fecha: Long = System.currentTimeMillis()
+    val fecha: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "NULL") val fechaEdicion: Long? = null,
+    @ColumnInfo(defaultValue = "0") val revision: Int = 0
 ) {
     companion object {
-        const val MINIMO_PARA_CONSOLIDAR = 2
+        const val MINIMO_PARA_CONSOLIDAR = 1
 
-        // "  AnA   PérEz " se convierte en "ana pérez" para evitar trucos
+        // "  AnA   PérEz " se convierte en "ana pérez" para evitar duplicados
         fun normalizarClave(nombre: String): String =
             nombre.trim().lowercase().replace(Regex("\\s+"), " ")
     }

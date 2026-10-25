@@ -14,7 +14,7 @@ object EvaluacionValidator {
         val texto = observacion.trim()
         if (texto.length > OBSERVACION_CRITERIO_MAX) return ValidationResult.error("Texto muy largo")
 
-        // Regla WIM100: Si la nota es 1 o 2, es obligación justificar por qué
+        // Si la nota es 1 o 2, es obligación justificar
         if (puntaje != null && puntaje <= 2 && texto.length < 10) {
             return ValidationResult.error("Justifica esta nota baja (mín. 10 caracteres)")
         }
@@ -22,6 +22,7 @@ object EvaluacionValidator {
     }
 
     fun validarObservacionGeneral(texto: String): ValidationResult {
+        if (texto.trim().length > OBSERVACION_GENERAL_MAX) return ValidationResult.error("Máximo $OBSERVACION_GENERAL_MAX caracteres")
         if (texto.trim().length < 20) return ValidationResult.error("Mínimo 20 caracteres")
         return ValidationResult.Valido
     }

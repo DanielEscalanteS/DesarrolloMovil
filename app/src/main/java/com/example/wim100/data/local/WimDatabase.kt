@@ -23,7 +23,7 @@ import com.example.wim100.model.RegistroHistorial
         PuntajeCriterio::class,
         RegistroHistorial::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -45,7 +45,7 @@ abstract class WimDatabase : RoomDatabase() {
                     WimDatabase::class.java,
                     "wim100.db"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .addMigrations(Migraciones.MIGRATION_1_2)
                     .build()
                     .also { instancia = it }
             }

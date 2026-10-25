@@ -16,4 +16,10 @@ interface HistorialDao {
 
     @Query("SELECT * FROM historial WHERE candidataId = :candidataId ORDER BY fecha DESC, id DESC")
     fun observarPorCandidata(candidataId: Long): Flow<List<RegistroHistorial>>
+
+    @Query("DELETE FROM historial WHERE candidataId = :candidataId")
+    suspend fun eliminarPorCandidata(candidataId: Long)
+
+    @Query("SELECT COUNT(*) FROM historial WHERE accion = :accion AND usuario = :usuario")
+    suspend fun contarAccion(accion: String, usuario: String): Int
 }

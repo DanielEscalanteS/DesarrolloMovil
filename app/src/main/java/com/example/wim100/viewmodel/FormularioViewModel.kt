@@ -1,85 +1,107 @@
 package com.example.wim100.viewmodel
+
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wim100.data.repository.CandidataRepository
 import com.example.wim100.model.Candidata
 import com.example.wim100.validation.CandidataValidator
+import com.example.wim100.validation.FormularioValidator
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
-import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 class FormularioViewModel(private val repository: CandidataRepository) : ViewModel() {
     private var intentoEnviar = false
+
     private val _uiState = MutableStateFlow(FormularioUiState())
-    val uiState: StateFlow<FormularioUiState> =
-        _uiState.asStateFlow()
+    val uiState: StateFlow<FormularioUiState> = _uiState.asStateFlow()
+
+
+
+    // FUNCIONES SIMPLES DE ACTUALIZACIÓN
     fun actualizarNombre(nombre: String) {
-        actualizarEstado { it.copy(nombre = nombre) }
+        val nuevoEstado = _uiState.value.copy(nombre = nombre)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarCorreo(correo: String) {
-        actualizarEstado { it.copy(correo = correo) }
+        val nuevoEstado = _uiState.value.copy(correo = correo)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarTelefono(telefono: String) {
-        actualizarEstado { it.copy(telefono = telefono) }
+        val nuevoEstado = _uiState.value.copy(telefono = telefono)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarArea(area: String) {
-        actualizarEstado { it.copy(area = area) }
+        val nuevoEstado = _uiState.value.copy(area = area)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarAnios(aniosExperiencia: String) {
-        actualizarEstado { it.copy(aniosExperiencia = aniosExperiencia) }
+        val nuevoEstado = _uiState.value.copy(aniosExperiencia = aniosExperiencia)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarResumen(resumenExperiencia: String) {
-        actualizarEstado { it.copy(resumenExperiencia = resumenExperiencia) }
+        val nuevoEstado = _uiState.value.copy(resumenExperiencia = resumenExperiencia)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarLinkedin(linkedinUrl: String) {
-        actualizarEstado { it.copy(linkedinUrl = linkedinUrl) }
+        val nuevoEstado = _uiState.value.copy(linkedinUrl = linkedinUrl)
+        aplicarCambios(nuevoEstado)
     }
+
     fun actualizarCv(uri: String, nombre: String?, tamano: Long?) {
-        actualizarEstado {
-            it.copy(cvUri = uri, cvNombre = nombre, cvTamano = tamano)
-        }
+        val nuevoEstado = _uiState.value.copy(cvUri = uri, cvNombre = nombre, cvTamano = tamano)
+        aplicarCambios(nuevoEstado)
     }
+
     fun informarErrorArchivo(mensaje: String) {
-        _uiState.update { it.copy(errorGuardado = mensaje) }
+        _uiState.value = _uiState.value.copy(errorGuardado = mensaje)
     }
-    private fun actualizarEstado(
-        cambio: (FormularioUiState) -> FormularioUiState
-    ) {
+
+
+
+    // VALIDACIONES
+    private fun aplicarCambios(estadoPropuesto: FormularioUiState) {
         if (_uiState.value.guardando || _uiState.value.idGuardado != null) return
-        _uiState.update { estado ->
-            val nuevoEstado = cambio(estado).copy(errorGuardado = null)
 
-            if (nuevoEstado.intentoContinuar) {
-                validarEstado(nuevoEstado)
-            } else {
-                nuevoEstado.copy(formularioValido = false)
-            }
+        var estadoLimpio = estadoPropuesto.copy(errorGuardado = null)
+
+        if (estadoLimpio.intentoContinuar) {
+            estadoLimpio = validarEstado(estadoLimpio)
+        } else {
+            estadoLimpio = estadoLimpio.copy(formularioValido = false)
         }
+
+        _uiState.value = estadoLimpio
     }
-    fun validarFormulario(): Boolean {
-        _uiState.update { estado ->
-            validarEstado(
-                estado.copy(intentoContinuar = true)
-            )
-        }
 
+    fun validarFormulario(): Boolean {
+        val estadoActual = _uiState.value
+        val estadoConIntento = estadoActual.copy(intentoContinuar = true)
+
+        _uiState.value = validarEstado(estadoConIntento)
         return _uiState.value.formularioValido
     }
+
     fun validarPostulacion(): Boolean {
         intentoEnviar = true
         return validarFormulario()
     }
-    private fun validarEstado(
-        estado: FormularioUiState
-    ): FormularioUiState {
+
+    private fun validarEstado(estado: FormularioUiState): FormularioUiState {
         val errores = FormularioValidator.validarFormulario(
             estado.nombre,
             estado.correo,
             estado.telefono
         )
+
         if (intentoEnviar) {
             val erroresCompletos = errores.copy(
                 area = CandidataValidator.validarArea(estado.area).mensaje,
@@ -92,20 +114,21 @@ class FormularioViewModel(private val repository: CandidataRepository) : ViewMod
                     CandidataValidator.validarCv(estado.cvNombre, estado.cvTamano).mensaje
                 }
             )
-            return estado.copy(
-                errores = erroresCompletos,
-                formularioValido = !erroresCompletos.hayErrores
-            )
+            return estado.copy(errores = erroresCompletos, formularioValido = !erroresCompletos.hayErrores)
         }
-        return estado.copy(
-            errores = errores,
-            formularioValido = !errores.hayErrores
-        )
+
+        return estado.copy(errores = errores, formularioValido = !errores.hayErrores)
     }
+
+
+
+    // CONEXIÓN CON LA BASE DE DATOS (Room)
     fun enviarPostulacion() {
         if (_uiState.value.guardando || _uiState.value.idGuardado != null || !validarPostulacion()) return
+
         val estado = _uiState.value
-        _uiState.update { it.copy(guardando = true, errorGuardado = null) }
+        _uiState.value = estado.copy(guardando = true, errorGuardado = null)
+
         viewModelScope.launch {
             try {
                 val candidata = Candidata(
@@ -121,18 +144,14 @@ class FormularioViewModel(private val repository: CandidataRepository) : ViewMod
                     registradaPor = estado.nombre.trim()
                 )
                 val idGenerado = repository.registrar(candidata)
-                _uiState.update {
-                    it.copy(guardando = false, idGuardado = idGenerado)
-                }
+                _uiState.value = _uiState.value.copy(guardando = false, idGuardado = idGenerado)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        guardando = false,
-                        errorGuardado = e.message ?: "No se pudo guardar la postulación"
-                    )
-                }
+                _uiState.value = _uiState.value.copy(
+                    guardando = false,
+                    errorGuardado = e.message ?: "No se pudo guardar la postulación"
+                )
             }
         }
     }

@@ -25,7 +25,7 @@ interface CandidataDao {
         return id
     }
 
-    // Flow significa que esta lista se actualizará SOLA en la pantalla si alguien agrega una candidata
+    // Flow (para que la lista se actualice sola en la pantalla si alguien agrega una candidata)
     @Query("SELECT * FROM candidatas ORDER BY fechaRegistro DESC")
     fun observarTodas(): Flow<List<Candidata>>
 
@@ -43,4 +43,29 @@ interface CandidataDao {
 
     @Query("SELECT COUNT(*) FROM candidatas WHERE LOWER(correo) = LOWER(:correo)")
     suspend fun contarPorCorreo(correo: String): Int
+
+    @Query("DELETE FROM candidatas WHERE id = :id")
+    suspend fun eliminar(id: Long): Int
+
+    @Query("SELECT COUNT(*) FROM candidatas WHERE cvUri = :uri")
+    suspend fun contarPorCvUri(uri: String): Int
+
+    @Query("UPDATE candidatas SET area = :area WHERE correo = :correo AND registradaPor = :responsable")
+    suspend fun actualizarAreaEjemplo(correo: String, responsable: String, area: String)
+
+    @Query("""
+        UPDATE candidatas SET estado = :nuevoEstado
+        WHERE id = :id AND estado = :estadoActual
+        AND (SELECT COUNT(*) FROM evaluaciones WHERE candidataId = :id) >= :minimo
+    """)
+    suspend fun resolverSiEvaluada(id: Long, nuevoEstado: EstadoCandidatura,
+        estadoActual: EstadoCandidatura, minimo: Int): Int
+
+    @Transaction
+    suspend fun resolverConHistorial(id: Long, nuevoEstado: EstadoCandidatura,
+        registro: RegistroHistorial, minimo: Int) {
+        val actualizadas = resolverSiEvaluada(id, nuevoEstado, EstadoCandidatura.EVALUADA, minimo)
+        check(actualizadas == 1) { "La candidatura debe estar evaluada y no resuelta" }
+        insertarHistorial(registro)
+    }
 }

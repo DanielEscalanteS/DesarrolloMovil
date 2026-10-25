@@ -1,4 +1,5 @@
 package com.example.wim100.viewmodel
+import com.example.wim100.validation.FormularioValidator
 import org.junit.Assert.*
 import org.junit.Test
 

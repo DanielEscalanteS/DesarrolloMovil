@@ -8,7 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import com.example.wim100.ui.WimApp
 import com.example.wim100.ui.theme.WIM100Theme
 
-/** FragmentActivity para utilizar BiometricPrompt. */
+// FragmentActivity para poder utilizar el BiometricPrompt
 class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {

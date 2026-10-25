@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 
 data class CvImportado(val uri: String, val nombre: String, val tamano: Long)
 
-/** Copia el documento seleccionado al almacenamiento privado para conservarlo al reiniciar. */
+// Copia el documento seleccionado al almacenamiento privado para conservarlo al reiniciar
 object ArchivoPostulacion {
     suspend fun importar(context: Context, uri: Uri): CvImportado = withContext(Dispatchers.IO) {
         val limite = 5L * 1024 * 1024
