@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
+import com.example.wim100.data.local.CandidataConEvaluaciones
 import com.example.wim100.model.DetallePuntaje
 import com.example.wim100.model.Evaluacion
 import com.example.wim100.model.PuntajeCriterio
@@ -26,6 +28,13 @@ interface EvaluacionDao {
 
     @Query("SELECT * FROM evaluaciones WHERE candidataId = :candidataId ORDER BY fecha DESC")
     fun observarPorCandidata(candidataId: Long): Flow<List<Evaluacion>>
+
+    @Query("SELECT * FROM evaluaciones ORDER BY fecha DESC, id DESC")
+    fun observarTodas(): Flow<List<Evaluacion>>
+
+    @Transaction
+    @Query("SELECT * FROM candidatas WHERE id = :candidataId")
+    fun observarFicha(candidataId: Long): Flow<CandidataConEvaluaciones?>
 
     @Query(
         """

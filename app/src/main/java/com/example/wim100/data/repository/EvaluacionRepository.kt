@@ -3,6 +3,7 @@ package com.example.wim100.data.repository
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import com.example.wim100.data.local.WimDatabase
+import com.example.wim100.data.local.CandidataConEvaluaciones
 import com.example.wim100.validation.EvaluacionValidator
 import com.example.wim100.model.Acciones
 import com.example.wim100.model.CalculadoraPuntaje
@@ -37,6 +38,9 @@ class EvaluacionRepository(
     fun observarPorCandidata(candidataId: Long): Flow<List<Evaluacion>> = evaluacionDao.observarPorCandidata(candidataId)
     fun observarDetallePuntajes(candidataId: Long): Flow<List<DetallePuntaje>> = evaluacionDao.observarDetallePuntajes(candidataId)
     fun observarConsolidado(): Flow<List<ResultadoConsolidado>> = evaluacionDao.observarConsolidado()
+
+    fun observarTodas(): Flow<List<Evaluacion>> = evaluacionDao.observarTodas()
+    fun observarFicha(candidataId: Long): Flow<CandidataConEvaluaciones?> = evaluacionDao.observarFicha(candidataId)
 
     suspend fun yaEvaluo(candidataId: Long, evaluadora: String): Boolean {
         val clave = Evaluacion.normalizarClave(evaluadora)

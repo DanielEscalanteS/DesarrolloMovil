@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.wim100.data.repository.EvaluacionRepository
 import com.example.wim100.model.CalculadoraPuntaje
 import com.example.wim100.model.Criterio
+import com.example.wim100.model.CriteriosDemostracion
 import com.example.wim100.validation.EvaluacionValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,13 +35,7 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
         viewModelScope.launch {
             try {
             // 1. Inyectamos los criterios oficiales de WIM100 si la base de datos está vacía
-            val criteriosOficiales = listOf(
-                Criterio(nombre = "Trayectoria", descripcion = "Años y relevancia de experiencia.", peso = 25, orden = 1),
-                Criterio(nombre = "Conocimientos", descripcion = "Certificaciones y educación.", peso = 25, orden = 2),
-                Criterio(nombre = "Liderazgo", descripcion = "Habilidades de gestión y equipo.", peso = 20, orden = 3),
-                Criterio(nombre = "Visión", descripcion = "Perspectiva estratégica en ciberseguridad.", peso = 15, orden = 4),
-                Criterio(nombre = "Comunicación", descripcion = "Claridad en la entrega de ideas.", peso = 15, orden = 5)
-            )
+            val criteriosOficiales = CriteriosDemostracion.lista
             repository.asegurarCriterios(criteriosOficiales)
 
             // 2. Se leen y se muestran en pantalla

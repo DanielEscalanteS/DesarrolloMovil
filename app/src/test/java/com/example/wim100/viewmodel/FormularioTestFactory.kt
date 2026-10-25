@@ -21,11 +21,14 @@ internal fun crearFormularioViewModel(): FormularioViewModel {
             estadoActual: EstadoCandidatura, minimo: Int): Int = 0
         override suspend fun contar(): Int = 0
         override suspend fun contarPorCorreo(correo: String): Int = 0
+        override suspend fun eliminar(id: Long): Int = error("No se debe borrar en un test de validación")
+        override suspend fun contarPorCvUri(uri: String): Int = 0
     }
     val historial = object : HistorialDao {
         override suspend fun insertar(registro: RegistroHistorial): Long = error("No se debe guardar")
         override fun observarTodo(): Flow<List<RegistroHistorial>> = flowOf(emptyList())
         override fun observarPorCandidata(candidataId: Long): Flow<List<RegistroHistorial>> = flowOf(emptyList())
+        override suspend fun eliminarPorCandidata(candidataId: Long): Unit = error("No se debe borrar")
     }
     return FormularioViewModel(CandidataRepository(candidatas, HistorialRepository(historial)))
 }

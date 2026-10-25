@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -12,6 +13,7 @@ import com.example.wim100.model.EstadoCandidatura
 import com.example.wim100.model.Sesion
 import com.example.wim100.model.Evaluacion
 import com.example.wim100.viewmodel.DireccionViewModel
+import com.example.wim100.ui.components.FiltroEstado
 
 @Composable
 fun DireccionScreen(
@@ -19,6 +21,7 @@ fun DireccionScreen(
     viewModel: DireccionViewModel,
     sesion: Sesion,
     onHistorial: () -> Unit,
+    onVerEvaluaciones: (Long) -> Unit,
     onVolver: () -> Unit
 ) {
     // Escucha la lista en tiempo real desde el viewmodel
@@ -29,6 +32,8 @@ fun DireccionScreen(
     val cargando by viewModel.cargando.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     var pendiente by remember { mutableStateOf<Pair<Long, EstadoCandidatura>?>(null) }
+    var filtro by rememberSaveable { mutableStateOf<EstadoCandidatura?>(null) }
+    val rankingFiltrado = listaRanking.filter { filtro == null || it.estado == filtro }
 
     pendiente?.let { resolucion ->
         AlertDialog(
@@ -52,6 +57,7 @@ fun DireccionScreen(
         Text("Responsable: $nombreDirector")
         OutlinedButton(onClick = onHistorial) { Text("Ver historial de acciones") }
         mensaje?.let { Text(it) }
+        FiltroEstado(filtro) { filtro = it }
 
         if (cargando) {
             CircularProgressIndicator()
@@ -60,18 +66,24 @@ fun DireccionScreen(
         } else if (listaRanking.isEmpty()) {
             Text("Aún no hay candidatas en el sistema.")
         } else {
+            if (rankingFiltrado.isEmpty()) Text("No hay candidatas con este estado.")
             LazyColumn(modifier = Modifier.weight(1f)) {
                 // itemsIndexed da el número de la posición en el ranking
-                itemsIndexed(listaRanking) { index, candidata ->
+                itemsIndexed(rankingFiltrado, key = { _, candidata -> candidata.candidataId }) { _, candidata ->
                     ElevatedCard(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text("#${index + 1} - ${candidata.nombre}", style = MaterialTheme.typography.titleMedium)
+                            val posicion = listaRanking.indexOfFirst { it.candidataId == candidata.candidataId } + 1
+                            Text("#$posicion - ${candidata.nombre}", style = MaterialTheme.typography.titleMedium)
                             Text("Área: ${candidata.area}", style = MaterialTheme.typography.bodySmall)
 
                             val promedio = candidata.promedio ?: 0.0
                             if (candidata.promedio == null) Text("Sin evaluaciones")
                             Text("Promedio: ${String.format("%.1f", promedio)} pts (${candidata.totalEvaluaciones} evaluaciones)", color = MaterialTheme.colorScheme.primary)
                             Text("Estado actual: ${candidata.estado.etiqueta}")
+                            TextButton(onClick = { onVerEvaluaciones(candidata.candidataId) }) { Text("Ver evaluaciones y comparar") }
+                            candidata.motivoBloqueoResolucion?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall)
+                            }
 
                             Spacer(modifier = Modifier.height(8.dp))
 

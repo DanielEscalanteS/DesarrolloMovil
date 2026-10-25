@@ -9,6 +9,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.wim100.model.Rol
 import com.example.wim100.viewmodel.SesionViewModel
 import com.example.wim100.ui.screens.HistorialScreen
+import com.example.wim100.ui.screens.DetalleEvaluacionesScreen
+import com.example.wim100.ui.screens.DatosEjemploScreen
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,7 +40,8 @@ fun WimApp() {
         AppViewModelFactory(
             candidataRepository = application.container.candidataRepository,
             evaluacionRepository = application.container.evaluacionRepository,
-            historialRepository = application.container.historialRepository
+            historialRepository = application.container.historialRepository,
+            datosEjemploRepository = application.container.datosEjemploRepository
         )
     }
 
@@ -129,6 +132,7 @@ fun WimApp() {
                         try { context.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
                         catch (e: Exception) { Toast.makeText(context, "Abre Seguridad en los ajustes", Toast.LENGTH_SHORT).show() }
                     }) { Text("Configurar seguridad del dispositivo") }
+                    TextButton(enabled = !verificando, onClick = { navController.navigate("datos-ejemplo") }) { Text("Preparar datos de ejemplo") }
                 }
             }
 
@@ -144,6 +148,8 @@ fun WimApp() {
                 if (sesion?.rol == Rol.EVALUADORA) {
                 CandidatasScreen(
                     viewModel = viewModel(factory = factory),
+                    nombreEvaluadora = checkNotNull(sesion).nombre,
+                    onVerEvaluaciones = { id -> navController.navigate("detalle-evaluaciones/$id") },
                     onVolver = { salir = true },
                     // Cuando aprietan el botón "Evaluar", viajamos a la ruta de evaluación pasándole el ID de la niña
                     onEvaluar = { id -> navController.navigate("evaluacion/$id") }
@@ -173,6 +179,7 @@ fun WimApp() {
                     nombreDirector = checkNotNull(sesion).nombre,
                     sesion = checkNotNull(sesion),
                     onHistorial = { navController.navigate("historial") },
+                    onVerEvaluaciones = { id -> navController.navigate("detalle-evaluaciones/$id") },
                     viewModel = viewModel(factory = factory),
                     onVolver = { salir = true }
                 )
@@ -183,6 +190,25 @@ fun WimApp() {
                 if (sesion?.rol == Rol.DIRECCION) {
                     HistorialScreen(viewModel = viewModel(factory = factory), onVolver = { navController.popBackStack() })
                 } else Text("Acceso no permitido")
+            }
+
+            composable("detalle-evaluaciones/{candidataId}") { backStackEntry ->
+                val id = backStackEntry.arguments?.getString("candidataId")?.toLongOrNull()
+                val actual = sesion
+                if (id != null && id > 0 && actual != null && actual.rol in listOf(Rol.EVALUADORA, Rol.DIRECCION)) {
+                    DetalleEvaluacionesScreen(
+                        candidataId = id,
+                        nombreEvaluadora = actual.nombre.takeIf { actual.rol == Rol.EVALUADORA },
+                        viewModel = viewModel(factory = factory),
+                        onVolver = { navController.popBackStack() }
+                    )
+                } else Text("Acceso no permitido")
+            }
+
+            composable("datos-ejemplo") {
+                if (sesion == null) {
+                    DatosEjemploScreen(viewModel = viewModel(factory = factory), onVolver = { navController.popBackStack() })
+                } else Text("Cierra sesión para preparar los ejemplos.")
             }
         }
         }

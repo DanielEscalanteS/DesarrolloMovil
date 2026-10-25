@@ -11,25 +11,33 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.wim100.model.EstadoCandidatura
+import com.example.wim100.ui.components.FiltroEstado
 import com.example.wim100.viewmodel.CandidatasViewModel
 
 @Composable
 fun CandidatasScreen(
     viewModel: CandidatasViewModel,
+    nombreEvaluadora: String,
     onVolver: () -> Unit,
+    onVerEvaluaciones: (Long) -> Unit,
     onEvaluar: (Long) -> Unit // Recibe la orden para viajar a la pantalla de notas
 ) {
     val s by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current // Necesario para pedirle al celular que abra el PDF
+    var filtro by rememberSaveable { mutableStateOf<EstadoCandidatura?>(null) }
+    val candidatasFiltradas = s.candidatas.filter { filtro == null || it.estado == filtro }
 
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = onVolver) { Text("Volver") }
         Text("Bandeja de Evaluadoras", style = MaterialTheme.typography.headlineMedium)
+        Text("Evaluadora: $nombreEvaluadora")
+        FiltroEstado(filtro) { filtro = it }
 
         if (s.cargando) {
             CircularProgressIndicator()
@@ -38,8 +46,10 @@ fun CandidatasScreen(
         } else if (s.candidatas.isEmpty()) {
             Text("Todavía no hay postulaciones.")
         } else {
+            if (candidatasFiltradas.isEmpty()) Text("No hay candidatas con este estado.")
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(s.candidatas, key = { it.id }) { candidata ->
+                items(candidatasFiltradas, key = { it.id }) { candidata ->
+                    val yaEvaluo = s.yaEvaluo(candidata.id, nombreEvaluadora)
                     ElevatedCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -53,6 +63,8 @@ fun CandidatasScreen(
                             }
                             Text(candidata.area)
                             Text("Estado: ${candidata.estado.etiqueta}")
+                            Text(if (yaEvaluo) "Ya evaluaste" else if (candidata.estado.estaResuelta) "Candidatura resuelta" else "Pendiente de tu evaluación",
+                                color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
                             Text("CV: ${candidata.cvNombre ?: "Sin adjunto"}", style = MaterialTheme.typography.bodySmall)
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -84,11 +96,14 @@ fun CandidatasScreen(
                                 }
 
                                 // BOTÓN 2 - EVALUAR (Solo aparece si no está resuelta)
-                                if (candidata.estado == EstadoCandidatura.POSTULADA || candidata.estado == EstadoCandidatura.EN_EVALUACION) {
+                                if (!candidata.estado.estaResuelta && !yaEvaluo) {
                                     Button(onClick = { onEvaluar(candidata.id) }) {
                                         Text("Evaluar")
                                     }
                                 }
+                            }
+                            TextButton(onClick = { onVerEvaluaciones(candidata.id) }) {
+                                Text("Ver evaluaciones (${s.totalEvaluaciones(candidata.id)})")
                             }
                         }
                     }
