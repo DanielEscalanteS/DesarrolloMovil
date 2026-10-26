@@ -1,6 +1,6 @@
-# WIM100 – Gestión de Talentos
+# Proyecto de WIM100
 
-Aplicación móvil para Android desarrollada como proyecto académico de la asignatura Desarrollo de Aplicaciones Móviles de Duoc UC.
+Proyecto de creación de una aplicación móvil para Android, creada con Android Studio.
 
 WIM100 permite gestionar postulaciones, evaluar candidatas mediante criterios ponderados y apoyar la toma de decisiones desde un panel de Dirección.
 
@@ -187,10 +187,10 @@ La comprobación del contenido real del documento mediante `PdfRenderer` requier
 
 ### Resultados
 
-- Compilación de la aplicación: exitosa.
-- Pruebas unitarias del CV: exitosas.
-- Ejecución general de pruebas unitarias: exitosa.
-- Verificación manual de interfaces en orientación horizontal: realizada.
+- Compilación de la aplicación exitosa.
+- Pruebas unitarias del CV exitosas.
+- Ejecución general de pruebas unitarias exitosa.
+- Verificación manual de interfaces en orientación horizontal realizada.
 
 ## 10. Diseño responsivo
 
@@ -220,15 +220,3 @@ Entre las mejoras implementadas se encuentran:
 - Componentes reutilizables.
 - Adaptación de pantallas a orientación horizontal.
 - Pruebas automatizadas de validación.
-
-## 12. Contexto académico
-
-**Proyecto:** WIM100 – Gestión de Talentos
-
-**Asignatura:** Desarrollo de Aplicaciones Móviles (DSY1105)
-
-**Institución:** Duoc UC
-
-**Tipo de proyecto:** Aplicación móvil Android
-
-**Finalidad:** Desarrollo y evaluación académica.
