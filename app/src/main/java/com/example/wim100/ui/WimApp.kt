@@ -1,5 +1,7 @@
 package com.example.wim100.ui
 
+import com.example.wim100.ui.screens.DetallePostulacionScreen
+import com.example.wim100.viewmodel.CandidatasViewModel
 import android.widget.Toast
 import android.content.Intent
 import android.provider.Settings
@@ -163,15 +165,86 @@ fun WimApp() {
             // 3. Bandeja de Candidatas
             composable("candidatas") {
                 if (sesion?.rol == Rol.EVALUADORA) {
-                CandidatasScreen(
-                    viewModel = viewModel(factory = factory),
-                    nombreEvaluadora = checkNotNull(sesion).nombre,
-                    onVerEvaluaciones = { id -> navController.navigate("detalle-evaluaciones/$id") },
-                    onVolver = { salir = true },
-                    // Cuando aprietan el botón "Evaluar", viajamos a la ruta de evaluación pasándole el ID de la niña
-                    onEvaluar = { id -> navController.navigate("evaluacion/$id") }
-                )
+
+                    CandidatasScreen(
+                        viewModel = viewModel(factory = factory),
+                        nombreEvaluadora = checkNotNull(sesion).nombre,
+
+                        onVerEvaluaciones = { id ->
+                            navController.navigate("detalle-evaluaciones/$id")
+                        },
+
+                        onVerPostulacion = { id ->
+                            navController.navigate("detalle-postulacion/$id")
+                        },
+
+                        onVolver = { salir = true },
+
+                        onEvaluar = { id ->
+                            navController.navigate("evaluacion/$id")
+                        }
+                    )
+
                 } else Text("Acceso no permitido")
+            }
+
+            composable("detalle-postulacion/{candidataId}") { backStackEntry ->
+
+                val id = backStackEntry.arguments
+                    ?.getString("candidataId")
+                    ?.toLongOrNull()
+
+                if (sesion?.rol == Rol.EVALUADORA && id != null && id > 0L) {
+
+                    val detalleViewModel: CandidatasViewModel =
+                        viewModel(factory = factory)
+
+                    val estado by detalleViewModel.uiState
+                        .collectAsStateWithLifecycle()
+
+                    when {
+                        estado.cargando -> {
+                            CircularProgressIndicator()
+                        }
+
+                        estado.error != null -> {
+                            Text(
+                                estado.error.orEmpty(),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        else -> {
+                            val candidata = estado.candidatas.find {
+                                it.id == id
+                            }
+
+                            if (candidata != null) {
+                                DetallePostulacionScreen(
+                                    candidata = candidata,
+                                    onVolver = {
+                                        navController.popBackStack()
+                                    }
+                                )
+                            } else {
+                                Column {
+                                    Text("No se encontró la postulación.")
+
+                                    TextButton(
+                                        onClick = {
+                                            navController.popBackStack()
+                                        }
+                                    ) {
+                                        Text("Volver")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                } else {
+                    Text("Acceso no permitido")
+                }
             }
 
             // 4. Pantalla para poner las notas (Recibe un ID)

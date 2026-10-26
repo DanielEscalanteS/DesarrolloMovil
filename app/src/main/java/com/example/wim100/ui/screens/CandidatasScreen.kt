@@ -22,6 +22,7 @@ import com.example.wim100.model.EstadoCandidatura
 import com.example.wim100.ui.components.FiltroEstado
 import com.example.wim100.viewmodel.CandidatasViewModel
 import com.example.wim100.ui.components.PantallaDesplazable
+import androidx.compose.ui.text.style.TextOverflow
 import java.io.File
 
 @Composable
@@ -30,7 +31,8 @@ fun CandidatasScreen(
     nombreEvaluadora: String,
     onVolver: () -> Unit,
     onVerEvaluaciones: (Long) -> Unit,
-    onEvaluar: (Long) -> Unit
+    onEvaluar: (Long) -> Unit,
+    onVerPostulacion: (Long) -> Unit
 ) {
     val s by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -119,7 +121,9 @@ fun CandidatasScreen(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+
                             Row(
+                                modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -132,9 +136,25 @@ fun CandidatasScreen(
 
                                 Text(
                                     text = candidata.nombre,
-                                    style = MaterialTheme.typography.titleLarge
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+
+                                TextButton(
+                                    onClick = {
+                                        onVerPostulacion(candidata.id)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "Ver postulación",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
                             }
+
 
                             Text(candidata.area)
 
