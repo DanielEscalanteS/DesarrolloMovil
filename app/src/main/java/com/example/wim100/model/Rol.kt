@@ -17,5 +17,7 @@ enum class Rol(val etiqueta: String, val descripcion: String) {
 
 data class Sesion(
     val nombre: String,
-    val rol: Rol
+    val rol: Rol,
+    val id: Long? = null,
+    val usuario: String = ""
 )

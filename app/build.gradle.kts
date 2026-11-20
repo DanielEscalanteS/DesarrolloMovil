@@ -64,4 +64,10 @@ dependencies {
     // Recurso nativo: biometría (requiere FragmentActivity)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.fragment.ktx)
+
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.okhttp.logging)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
