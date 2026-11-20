@@ -1,5 +1,10 @@
 package com.example.wim100.data.repository
 
+import com.example.wim100.data.remote.aPostulanteRequest
+import com.example.wim100.data.remote.aCandidata
+import com.example.wim100.data.remote.WimApi
+import com.example.wim100.data.remote.RetrofitClient
+import com.example.wim100.data.remote.EstadoRequest
 import com.example.wim100.data.local.dao.CandidataDao
 import android.database.sqlite.SQLiteConstraintException
 import com.example.wim100.model.RegistroHistorial
@@ -10,10 +15,12 @@ import com.example.wim100.model.Evaluacion
 import com.example.wim100.model.Candidata
 import com.example.wim100.model.EstadoCandidatura
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class CandidataRepository(
     private val dao: CandidataDao,
-    private val historial: HistorialRepository
+    private val historial: HistorialRepository,
+    private val api: WimApi = RetrofitClient.wimApi
 ) {
     fun observarTodas(): Flow<List<Candidata>> = dao.observarTodas()
 
@@ -60,6 +67,102 @@ class CandidataRepository(
                 usuario = sesion.nombre
             ),
             Evaluacion.MINIMO_PARA_CONSOLIDAR
+        )
+    }
+
+
+    suspend fun sincronizarDesdeServidor() {
+        val postulantes = api.listarPostulantes()
+        val candidatasLocales = dao.observarTodas().first()
+
+        val localesPorId = candidatasLocales.associateBy { it.id }
+        val localesPorCorreo = candidatasLocales.associateBy {
+            it.correo.trim().lowercase()
+        }
+
+        postulantes.forEach { dto ->
+            val localPorId = localesPorId[dto.id]
+
+            check(
+                localPorId == null ||
+                        localPorId.correo.equals(dto.correo, ignoreCase = true)
+            ) {
+                "Conflicto de ID ${dto.id}: existe otra candidata local"
+            }
+
+            val localPorCorreo = localesPorCorreo[dto.correo.trim().lowercase()]
+
+            check(
+                localPorCorreo == null || localPorCorreo.id == dto.id
+            ) {
+                "Conflicto de correo: existe una candidata local con otro ID"
+            }
+        }
+
+        postulantes.forEach { dto ->
+            val candidataLocal = localesPorId[dto.id]
+
+            dao.guardarDesdeServidor(
+                dto.aCandidata(cvUri = candidataLocal?.cvUri)
+            )
+        }
+    }
+
+    suspend fun registrarEnServidor(candidata: Candidata): Long {
+        val respuesta = api.crearPostulante(
+            candidata.aPostulanteRequest()
+        )
+
+        dao.guardarDesdeServidor(
+            respuesta.aCandidata(cvUri = candidata.cvUri)
+        )
+        return respuesta.id
+    }
+
+    suspend fun actualizarEnServidor(candidata: Candidata) {
+        require(candidata.id > 0) {
+            "La candidata debe tener un ID válido"
+        }
+
+        val respuesta = api.actualizarPostulante(
+            candidata.id,
+            candidata.aPostulanteRequest()
+        )
+
+        val cvUriLocal = candidata.cvUri
+            ?: dao.obtenerPorId(respuesta.id)?.cvUri
+
+        dao.guardarDesdeServidor(
+            respuesta.aCandidata(cvUri = cvUriLocal)
+        )
+    }
+
+    suspend fun eliminarEnServidor(id: Long) {
+        require(id > 0) {
+            "La candidata debe tener un ID válido"
+        }
+
+        api.eliminarPostulante(id)
+        dao.eliminar(id)
+    }
+
+    suspend fun cambiarEstadoEnServidor(
+        id: Long,
+        estado: EstadoCandidatura
+    ) {
+        require(id > 0) {
+            "La candidata debe tener un ID válido"
+        }
+
+        val respuesta = api.cambiarEstado(
+            id,
+            EstadoRequest(estado = estado.name)
+        )
+
+        val cvUriLocal = dao.obtenerPorId(id)?.cvUri
+
+        dao.guardarDesdeServidor(
+            respuesta.aCandidata(cvUri = cvUriLocal)
         )
     }
 }
