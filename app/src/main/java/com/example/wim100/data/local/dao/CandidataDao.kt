@@ -1,5 +1,6 @@
 package com.example.wim100.data.local.dao
 
+import androidx.room.Upsert
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -14,6 +15,9 @@ import kotlinx.coroutines.flow.Flow
 interface CandidataDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertar(candidata: Candidata): Long
+
+    @Upsert
+    suspend fun guardarDesdeServidor(candidata: Candidata)
 
     @Insert
     suspend fun insertarHistorial(registro: RegistroHistorial): Long

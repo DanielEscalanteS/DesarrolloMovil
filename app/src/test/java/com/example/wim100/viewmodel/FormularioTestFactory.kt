@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.flowOf
 internal fun crearFormularioViewModel(): FormularioViewModel {
     val candidatas = object : CandidataDao {
         override suspend fun insertar(candidata: Candidata): Long = error("No se debe guardar en un test de validación")
+        override suspend fun guardarDesdeServidor(candidata: Candidata) {
+            error("No se debe guardar en un test de validación")
+        }
         override suspend fun insertarHistorial(registro: RegistroHistorial): Long = error("No se debe guardar")
         override fun observarTodas(): Flow<List<Candidata>> = flowOf(emptyList())
         override fun observarPorId(id: Long): Flow<Candidata?> = flowOf(null)
