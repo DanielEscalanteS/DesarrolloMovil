@@ -41,8 +41,14 @@ import androidx.compose.material.icons.filled.CheckCircle
 
 
 @Composable
-fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
+fun PostulacionScreen(
+    viewModel: FormularioViewModel,
+    usuario: String? = null,
+    candidataId: Long? = null,
+    onVolver: () -> Unit
+) {
     val s by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(candidataId) { candidataId?.let(viewModel::cargar) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var importando by remember { mutableStateOf(false) }
@@ -65,7 +71,7 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
                 }
             }
         }
-    val habilitado = !s.guardando && !importando && s.idGuardado == null
+    val habilitado = !s.cargando && !s.generandoNombre && !s.guardando && !importando && s.idGuardado == null && (candidataId == null || s.esEdicion)
 
     if (s.idGuardado != null) {
         AlertDialog(
@@ -82,7 +88,7 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
 
             title = {
                 Text(
-                    text = "¡Postulación enviada!",
+                    text = if (s.esEdicion) "Cambios guardados" else "¡Postulación enviada!",
                     style = MaterialTheme.typography.headlineSmall
                 )
             },
@@ -92,7 +98,7 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Tu postulación se ha registrado correctamente.",
+                        text = "Los datos se guardaron correctamente en el servidor.",
                         style = MaterialTheme.typography.bodyLarge
                     )
 
@@ -116,8 +122,9 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
                         }
                     }
 
+                    s.aviso?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                     Text(
-                        text = "Tus datos quedaron guardados localmente en este dispositivo.",
+                        text = "La app conserva una copia local. El PDF permanece en este dispositivo.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -144,7 +151,11 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
         //Text("Mi postulación", style = MaterialTheme.typography.headlineMedium)
         //Text("Completa tus antecedentes. Usa datos ficticios y un CV de prueba.")
         Text(
-            text = "Mi postulación",
+            text = when {
+                candidataId != null -> "Editar candidatura"
+                usuario == null -> "Mi postulación"
+                else -> "Nueva candidatura"
+            },
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary
         )
@@ -170,7 +181,18 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
             }
         }
 
+        if (s.cargando) CircularProgressIndicator()
+        if (candidataId != null && !s.cargando && !s.esEdicion) {
+            Text(s.errorGuardado.orEmpty(), color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = { viewModel.cargar(candidataId) }) { Text("Reintentar") }
+            return@Column
+        }
         Text("Datos personales", style = MaterialTheme.typography.titleMedium)
+        if (usuario != null) {
+            TextButton(onClick = viewModel::generarNombreFicticio, enabled = habilitado) {
+                Text(if (s.generandoNombre) "Generando…" else "Usar nombre de ejemplo")
+            }
+        }
 
         CampoFormulario(
             valor = s.nombre,
@@ -347,7 +369,7 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
             )
         }
         Button(
-            onClick = viewModel::enviarPostulacion,
+            onClick = { viewModel.enviarPostulacion(usuario) },
             enabled = habilitado,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -362,6 +384,7 @@ fun PostulacionScreen(viewModel: FormularioViewModel, onVolver: () -> Unit) {
                 targetState = when {
                     s.guardando -> "Guardando…"
                     importando -> "Leyendo PDF…"
+                    s.esEdicion -> "Guardar cambios"
                     else -> "Enviar postulación"
                 },
                 label = "AnimacionEstadoPostulacion"

@@ -81,8 +81,16 @@ fun WimNavHost(sesion: Sesion, factory: AppViewModelFactory, onCerrar: () -> Uni
 
             composable(Rutas.CANDIDATA_NUEVA) {
                 if (sesion.rol == Rol.EVALUADORA) {
-                    PostulacionScreen(viewModel = viewModel(factory = factory),
+                    PostulacionScreen(viewModel = viewModel(factory = factory), usuario = sesion.nombre,
                         onVolver = { navController.popBackStack() })
+                } else Text("Acceso no permitido")
+            }
+
+            composable(Rutas.CANDIDATA_EDITAR) { entradaFormulario ->
+                val id = entradaFormulario.arguments?.getString("candidataId")?.toLongOrNull()
+                if (sesion.rol == Rol.EVALUADORA && id != null && id > 0) {
+                    PostulacionScreen(viewModel = viewModel(factory = factory), usuario = sesion.nombre,
+                        candidataId = id, onVolver = { navController.popBackStack() })
                 } else Text("Acceso no permitido")
             }
 

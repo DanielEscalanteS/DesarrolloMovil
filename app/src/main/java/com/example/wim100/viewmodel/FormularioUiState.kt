@@ -1,6 +1,9 @@
 package com.example.wim100.viewmodel
 
 data class FormularioUiState(
+    val cargando: Boolean = false,
+    val esEdicion: Boolean = false,
+    val generandoNombre: Boolean = false,
     val nombre: String = "",
     val correo: String = "",
     val telefono: String = "",
@@ -14,6 +17,7 @@ data class FormularioUiState(
     val guardando: Boolean = false,
     val idGuardado: Long? = null,
     val errorGuardado: String? = null,
+    val aviso: String? = null,
     val errores: ErroresFormulario = ErroresFormulario(),
     val intentoContinuar: Boolean = false,
     val formularioValido: Boolean = false

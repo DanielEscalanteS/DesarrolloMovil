@@ -19,7 +19,7 @@ class AppViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         val instancia = when (modelClass) {
-            FormularioViewModel::class.java -> FormularioViewModel(candidataRepository)
+            FormularioViewModel::class.java -> FormularioViewModel(candidataRepository, randomUserRepository, historialRepository)
             CandidatasViewModel::class.java -> CandidatasViewModel(candidataRepository, evaluacionRepository)
             EvaluacionViewModel::class.java -> EvaluacionViewModel(evaluacionRepository)
             DireccionViewModel::class.java -> DireccionViewModel(evaluacionRepository, candidataRepository)
