@@ -72,6 +72,7 @@ fun WimNavHost(sesion: Sesion, factory: AppViewModelFactory, onCerrar: () -> Uni
                         viewModel = viewModel(factory = factory),
                         nombreEvaluadora = sesion.nombre,
                         onVolver = { salir = true },
+                        onCrear = { navController.navigate(Rutas.CANDIDATA_NUEVA) },
                         onVerEvaluaciones = { navController.navigate(Rutas.detalleEvaluaciones(it)) },
                         onEvaluar = { navController.navigate(Rutas.evaluacion(it)) },
                         onVerPostulacion = { navController.navigate(Rutas.detalleCandidata(it)) })
