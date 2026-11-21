@@ -22,7 +22,7 @@ class AppViewModelFactory(
             FormularioViewModel::class.java -> FormularioViewModel(candidataRepository, randomUserRepository, historialRepository)
             CandidatasViewModel::class.java -> CandidatasViewModel(candidataRepository, evaluacionRepository)
             EvaluacionViewModel::class.java -> EvaluacionViewModel(evaluacionRepository, candidataRepository)
-            DireccionViewModel::class.java -> DireccionViewModel(evaluacionRepository, candidataRepository)
+            DireccionViewModel::class.java -> DireccionViewModel(evaluacionRepository, candidataRepository, historialRepository)
             SesionViewModel::class.java -> SesionViewModel(historialRepository, authRepository)
             DetalleCandidataViewModel::class.java -> DetalleCandidataViewModel(candidataRepository, historialRepository)
             HistorialViewModel::class.java -> HistorialViewModel(historialRepository)

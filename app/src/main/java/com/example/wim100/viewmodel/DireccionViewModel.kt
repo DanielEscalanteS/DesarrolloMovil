@@ -2,6 +2,12 @@ package com.example.wim100.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wim100.data.remote.mensajeParaUsuario
+import com.example.wim100.data.repository.HistorialRepository
+import com.example.wim100.model.Acciones
+import com.example.wim100.model.CriteriosDemostracion
+import com.example.wim100.model.Rol
+import com.example.wim100.model.Evaluacion
 import com.example.wim100.data.repository.CandidataRepository
 import com.example.wim100.data.repository.EvaluacionRepository
 import com.example.wim100.model.EstadoCandidatura
@@ -27,7 +33,8 @@ data class FiltrosDireccion(
 
 class DireccionViewModel(
     private val evaluacionRepository: EvaluacionRepository,
-    private val candidataRepository: CandidataRepository
+    private val candidataRepository: CandidataRepository,
+    private val historialRepository: HistorialRepository
 ) : ViewModel() {
 
     private val _guardando = MutableStateFlow(false)
@@ -72,6 +79,26 @@ class DireccionViewModel(
         ComparacionCandidatas.ordenar(filtradas, puntajes, filtro.ascendente)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private var datosActualizados = false
+    private var refrescando = false
+
+    fun refrescar() {
+        if (refrescando || _guardando.value) return
+        refrescando = true
+        datosActualizados = false
+        _guardando.value = true
+        viewModelScope.launch {
+            try {
+                evaluacionRepository.asegurarCriterios(CriteriosDemostracion.lista)
+                candidataRepository.sincronizarDesdeServidor()
+                datosActualizados = true
+                _mensaje.value = null
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { _mensaje.value = e.mensajeParaUsuario() }
+            finally { refrescando = false; _guardando.value = false }
+        }
+    }
+
     fun filtrar(valor: FiltrosDireccion) { _filtros.value = valor }
 
     fun alternarComparacion(id: Long) {
@@ -97,12 +124,25 @@ class DireccionViewModel(
         _guardando.value = true
         viewModelScope.launch {
             try {
-                candidataRepository.resolver(candidataId, nuevoEstado, sesion)
-                _mensaje.value = "Resolución guardada"
+                check(datosActualizados) { "Refresca los postulantes antes de resolver una candidatura" }
+                require(sesion.rol == Rol.DIRECCION) { "Solo Dirección puede resolver candidaturas" }
+                require(nuevoEstado.estaResuelta) { "Selecciona una resolución válida" }
+                val ficha = evaluacionRepository.obtenerFicha(candidataId) ?: error("La candidatura no existe")
+                check(ficha.candidata.estado == EstadoCandidatura.EVALUADA &&
+                    ficha.evaluaciones.size >= Evaluacion.MINIMO_PARA_CONSOLIDAR) {
+                    "La candidatura debe estar evaluada y no resuelta"
+                }
+                candidataRepository.cambiarEstadoEnServidor(candidataId, nuevoEstado)
+                try {
+                    historialRepository.registrar(candidataId, Acciones.RESOLUCION,
+                        "Candidatura marcada como ${nuevoEstado.etiqueta}", sesion.nombre)
+                    _mensaje.value = "Resolución guardada"
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { _mensaje.value = "Resolución guardada; no se pudo registrar el historial" }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _mensaje.value = e.message ?: "No se pudo guardar la resolución"
+                _mensaje.value = e.mensajeParaUsuario()
             } finally {
                 _guardando.value = false
             }

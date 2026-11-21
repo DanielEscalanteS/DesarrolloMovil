@@ -26,9 +26,11 @@ fun DireccionScreen(
     sesion: Sesion,
     onHistorial: () -> Unit,
     onVerEvaluaciones: (Long) -> Unit,
+    onVerPostulacion: (Long) -> Unit,
     onComparar: (List<Long>) -> Unit,
     onVolver: () -> Unit
 ) {
+    LaunchedEffect(Unit) { viewModel.refrescar() }
     val listaRanking by viewModel.rankingConsolidado.collectAsStateWithLifecycle()
     val guardando by viewModel.guardando.collectAsStateWithLifecycle()
     val mensaje by viewModel.mensaje.collectAsStateWithLifecycle()
@@ -94,6 +96,7 @@ fun DireccionScreen(
                 )
 
                 Text("Responsable: $nombreDirector")
+                OutlinedButton(onClick = viewModel::refrescar, enabled = !guardando) { Text("Refrescar postulantes") }
 
                 OutlinedButton(onClick = onHistorial) {
                     Text("Ver historial de acciones")
@@ -305,6 +308,9 @@ fun DireccionScreen(
                             "Estado actual: ${candidata.estado.etiqueta}"
                         )
 
+                        OutlinedButton(onClick = { onVerPostulacion(candidata.candidataId) }) {
+                            Text("Ver postulación")
+                        }
                         TextButton(
                             onClick = {
                                 onVerEvaluaciones(candidata.candidataId)

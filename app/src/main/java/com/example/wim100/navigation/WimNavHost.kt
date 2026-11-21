@@ -138,6 +138,7 @@ fun WimNavHost(sesion: Sesion, factory: AppViewModelFactory, onCerrar: () -> Uni
                         viewModel = viewModel(factory = factory),
                         onHistorial = { navController.navigate(Rutas.HISTORIAL) },
                         onVerEvaluaciones = { navController.navigate(Rutas.detalleEvaluaciones(it)) },
+                        onVerPostulacion = { navController.navigate(Rutas.detalleCandidata(it)) },
                         onComparar = { navController.navigate(Rutas.comparar(it)) },
                         onVolver = { salir = true })
                 } else Text("Acceso no permitido")
