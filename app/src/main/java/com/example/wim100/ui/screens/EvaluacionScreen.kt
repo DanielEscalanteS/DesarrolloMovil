@@ -171,6 +171,7 @@ fun EvaluacionScreen(
                                             criterio.id, nota
                                         )
                                     },
+                                    enabled = !estado.guardando && !estado.pendienteSincronizar,
                                     modifier = Modifier.weight(1f),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
@@ -183,6 +184,7 @@ fun EvaluacionScreen(
                                             criterio.id, nota
                                         )
                                     },
+                                    enabled = !estado.guardando && !estado.pendienteSincronizar,
                                     modifier = Modifier.weight(1f),
                                     contentPadding = PaddingValues(0.dp)
                                 ) {
@@ -216,6 +218,7 @@ fun EvaluacionScreen(
                                 "Observación del criterio"
                             },
                             error = null,
+                            habilitado = !estado.guardando && !estado.pendienteSincronizar,
                             onCambio = {
                                 viewModel.actualizarObservacion(
                                     criterio.id, it
@@ -239,7 +242,8 @@ fun EvaluacionScreen(
                     onCambio = {
                         viewModel.actualizarObservacionGeneral(it)
                     },
-                    multilinea = true
+                    multilinea = true,
+                    habilitado = !estado.guardando && !estado.pendienteSincronizar
                 )
 
                 Button(
@@ -255,6 +259,7 @@ fun EvaluacionScreen(
                         text = when {
                             estado.guardando ->
                                 "Guardando en Base de Datos..."
+                            estado.pendienteSincronizar -> "Reintentar sincronización"
                             estado.editando ->
                                 "Guardar cambios"
                             else ->
@@ -268,7 +273,7 @@ fun EvaluacionScreen(
                     onClick = onVolver,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Cancelar y volver")
+                    Text(if (estado.pendienteSincronizar) "Volver (evaluación guardada localmente)" else "Cancelar y volver")
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

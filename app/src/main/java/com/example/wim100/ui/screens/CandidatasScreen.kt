@@ -32,9 +32,12 @@ fun CandidatasScreen(
     onVolver: () -> Unit,
     onVerEvaluaciones: (Long) -> Unit,
     onEvaluar: (Long) -> Unit,
-    onVerPostulacion: (Long) -> Unit
+    onVerPostulacion: (Long) -> Unit,
+    onCrear: () -> Unit
 ) {
     val s by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { viewModel.refrescar() }
+    val puedeModificar = !s.refrescando && s.error == null
     val context = LocalContext.current
 
     var filtro by rememberSaveable {
@@ -63,6 +66,14 @@ fun CandidatasScreen(
                 )
 
                 Text("Evaluadora: $nombreEvaluadora")
+                Button(onClick = onCrear, enabled = puedeModificar) { Text("Nueva candidata") }
+                OutlinedButton(onClick = viewModel::refrescar, enabled = !s.refrescando) {
+                    Text(if (s.refrescando) "Actualizando…" else "Refrescar")
+                }
+                if (s.refrescando) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (s.error != null && s.candidatas.isNotEmpty()) {
+                    Text(s.error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                }
 
                 FiltroEstado(filtro) {
                     filtro = it
@@ -78,7 +89,7 @@ fun CandidatasScreen(
                 }
             }
 
-            s.error != null -> {
+            s.error != null && s.candidatas.isEmpty() -> {
                 item {
                     Text(
                         text = s.error.orEmpty(),
@@ -146,6 +157,7 @@ fun CandidatasScreen(
                                     onClick = {
                                         onVerPostulacion(candidata.id)
                                     },
+                                    enabled = puedeModificar,
                                     contentPadding = PaddingValues(horizontal = 4.dp)
                                 ) {
                                     Text(
@@ -242,6 +254,7 @@ fun CandidatasScreen(
                                     evaluacion == null
                                 ) {
                                     Button(
+                                        enabled = puedeModificar,
                                         onClick = {
                                             onEvaluar(candidata.id)
                                         }
@@ -255,6 +268,7 @@ fun CandidatasScreen(
                                     yaEvaluo
                                 ) {
                                     IconButton(
+                                        enabled = puedeModificar,
                                         onClick = {
                                             onEvaluar(candidata.id)
                                         }
