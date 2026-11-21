@@ -21,7 +21,7 @@ class AppViewModelFactory(
         val instancia = when (modelClass) {
             FormularioViewModel::class.java -> FormularioViewModel(candidataRepository, randomUserRepository, historialRepository)
             CandidatasViewModel::class.java -> CandidatasViewModel(candidataRepository, evaluacionRepository)
-            EvaluacionViewModel::class.java -> EvaluacionViewModel(evaluacionRepository)
+            EvaluacionViewModel::class.java -> EvaluacionViewModel(evaluacionRepository, candidataRepository)
             DireccionViewModel::class.java -> DireccionViewModel(evaluacionRepository, candidataRepository)
             SesionViewModel::class.java -> SesionViewModel(historialRepository, authRepository)
             DetalleCandidataViewModel::class.java -> DetalleCandidataViewModel(candidataRepository, historialRepository)

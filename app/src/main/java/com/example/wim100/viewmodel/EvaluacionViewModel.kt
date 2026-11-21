@@ -2,6 +2,8 @@ package com.example.wim100.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.wim100.data.remote.mensajeParaUsuario
+import com.example.wim100.data.repository.CandidataRepository
 import com.example.wim100.data.repository.EvaluacionRepository
 import com.example.wim100.model.CalculadoraPuntaje
 import com.example.wim100.model.Criterio
@@ -28,13 +30,17 @@ data class EvaluacionUiState(
     val revision: Int = 0,
     val candidataNombre: String = "",
     val guardando: Boolean = false,
+    val pendienteSincronizar: Boolean = false,
     val finalizadoConExito: Boolean = false
 ) {
     // Para calcular la nota en tiempo real mientras el usuario teclea
     val puntajeTotal: Double get() = CalculadoraPuntaje.calcular(criterios, puntajes)
 }
 
-class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewModel() {
+class EvaluacionViewModel(
+    private val repository: EvaluacionRepository,
+    private val candidatas: CandidataRepository
+) : ViewModel() {
     private val _uiState = MutableStateFlow(EvaluacionUiState())
     val uiState: StateFlow<EvaluacionUiState> = _uiState.asStateFlow()
     private var candidataCargada: Long? = null
@@ -75,6 +81,7 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
 
     // Actualiza la nota de un criterio en específico
     fun actualizarPuntaje(criterioId: Long, nota: Int) {
+        if (_uiState.value.guardando || _uiState.value.pendienteSincronizar) return
         _uiState.update { estado ->
             val nuevosPuntajes = estado.puntajes + (criterioId to nota)
             estado.copy(puntajes = nuevosPuntajes)
@@ -82,10 +89,12 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
     }
 
     fun actualizarObservacion(criterioId: Long, texto: String) {
+        if (_uiState.value.guardando || _uiState.value.pendienteSincronizar) return
         _uiState.update { it.copy(observaciones = it.observaciones + (criterioId to texto)) }
     }
 
     fun actualizarObservacionGeneral(texto: String) {
+        if (_uiState.value.guardando || _uiState.value.pendienteSincronizar) return
         _uiState.update { it.copy(observacionGeneral = texto) }
     }
 
@@ -93,6 +102,10 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
     fun guardarEvaluacion(candidataId: Long, sesion: Sesion) {
         if (_uiState.value.guardando || _uiState.value.finalizadoConExito || !_uiState.value.puedeGuardar) return
         val estado = _uiState.value
+        if (estado.pendienteSincronizar) {
+            sincronizarEstado(candidataId)
+            return
+        }
         if (estado.criterios.isEmpty()) {
             _uiState.update { it.copy(errorGeneral = "Espera a que carguen los criterios") }
             return
@@ -127,7 +140,8 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
                     observaciones = estado.observaciones,
                     observacionGeneral = estado.observacionGeneral
                 )
-                _uiState.update { it.copy(guardando = false, finalizadoConExito = true) }
+                _uiState.update { it.copy(guardando = false, pendienteSincronizar = true) }
+                sincronizarEstado(candidataId)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -135,4 +149,21 @@ class EvaluacionViewModel(private val repository: EvaluacionRepository) : ViewMo
             }
         }
     }
+
+    private fun sincronizarEstado(candidataId: Long) {
+        _uiState.update { it.copy(guardando = true, errorGeneral = null) }
+        viewModelScope.launch {
+            try {
+                val candidata = candidatas.obtener(candidataId) ?: error("La candidatura no existe")
+                check(!candidata.estado.estaResuelta) { "Dirección ya resolvió esta candidatura" }
+                candidatas.cambiarEstadoEnServidor(candidataId, com.example.wim100.model.EstadoCandidatura.EVALUADA)
+                _uiState.update { it.copy(guardando = false, pendienteSincronizar = false, finalizadoConExito = true) }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                _uiState.update { it.copy(guardando = false,
+                    errorGeneral = "La evaluación quedó guardada en este dispositivo. Falta sincronizar el estado: ${e.mensajeParaUsuario()}") }
+            }
+        }
+    }
+
 }
