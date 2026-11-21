@@ -94,63 +94,33 @@ fun WimNavHost(sesion: Sesion, factory: AppViewModelFactory, onCerrar: () -> Uni
                 } else Text("Acceso no permitido")
             }
 
-            composable(Rutas.CANDIDATA_DETALLE) { backStackEntry ->
-
-                val id = backStackEntry.arguments
-                    ?.getString("candidataId")
-                    ?.toLongOrNull()
-
-                if (sesion.rol == Rol.EVALUADORA && id != null && id > 0L) {
-
-                    val detalleViewModel: CandidatasViewModel =
-                        viewModel(factory = factory)
-
-                    val estado by detalleViewModel.uiState
-                        .collectAsStateWithLifecycle()
-
-                    when {
-                        estado.cargando -> {
-                            CircularProgressIndicator()
-                        }
-
-                        estado.error != null -> {
-                            Text(
-                                estado.error.orEmpty(),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-
-                        else -> {
-                            val candidata = estado.candidatas.find {
-                                it.id == id
-                            }
-
-                            if (candidata != null) {
-                                DetallePostulacionScreen(
-                                    candidata = candidata,
-                                    onVolver = {
-                                        navController.popBackStack()
-                                    }
-                                )
-                            } else {
-                                Column {
-                                    Text("No se encontró la postulación.")
-
-                                    TextButton(
-                                        onClick = {
-                                            navController.popBackStack()
-                                        }
-                                    ) {
-                                        Text("Volver")
-                                    }
-                                }
-                            }
+            composable(Rutas.CANDIDATA_DETALLE) { entradaDetalle ->
+                val id = entradaDetalle.arguments?.getString("candidataId")?.toLongOrNull()
+                if (id != null && id > 0) {
+                    val detalle: DetalleCandidataViewModel = viewModel(factory = factory)
+                    val estado by detalle.uiState.collectAsStateWithLifecycle()
+                    LaunchedEffect(id) { detalle.cargar(id) }
+                    LaunchedEffect(estado.eliminada) {
+                        if (estado.eliminada) {
+                            Toast.makeText(context, estado.error ?: "Candidatura eliminada", Toast.LENGTH_LONG).show()
+                            navController.popBackStack()
                         }
                     }
-
-                } else {
-                    Text("Acceso no permitido")
-                }
+                    val candidata = estado.candidata
+                    when {
+                        estado.cargando -> CircularProgressIndicator()
+                        candidata == null -> Column {
+                            Text(estado.error ?: "La candidata ya no está disponible")
+                            TextButton(onClick = { navController.popBackStack() }) { Text("Volver") }
+                        }
+                        else -> DetallePostulacionScreen(
+                            candidata = candidata, rol = sesion.rol,
+                            eliminando = estado.eliminando, error = estado.error,
+                            onVolver = { navController.popBackStack() },
+                            onEditar = { navController.navigate(Rutas.editarCandidata(id)) },
+                            onEliminar = { detalle.eliminar(sesion) })
+                    }
+                } else Text("Identificador de candidatura inválido")
             }
 
             composable(Rutas.EVALUACION) { entradaEvaluacion ->

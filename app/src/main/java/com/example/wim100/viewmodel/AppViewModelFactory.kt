@@ -24,6 +24,7 @@ class AppViewModelFactory(
             EvaluacionViewModel::class.java -> EvaluacionViewModel(evaluacionRepository)
             DireccionViewModel::class.java -> DireccionViewModel(evaluacionRepository, candidataRepository)
             SesionViewModel::class.java -> SesionViewModel(historialRepository, authRepository)
+            DetalleCandidataViewModel::class.java -> DetalleCandidataViewModel(candidataRepository, historialRepository)
             HistorialViewModel::class.java -> HistorialViewModel(historialRepository)
             DetalleEvaluacionesViewModel::class.java -> DetalleEvaluacionesViewModel(evaluacionRepository)
             DatosEjemploViewModel::class.java -> DatosEjemploViewModel(datosEjemploRepository)
