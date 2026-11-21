@@ -1,6 +1,7 @@
 package com.example.wim100.navigation
 
 object Rutas {
+    const val INICIO = "inicio"
     const val LOGIN = "login"
     const val CANDIDATAS = "candidatas"
     const val CANDIDATA_NUEVA = "candidata/nueva"

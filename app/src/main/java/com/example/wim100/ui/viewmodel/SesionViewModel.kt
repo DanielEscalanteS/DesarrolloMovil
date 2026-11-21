@@ -1,5 +1,3 @@
 package com.example.wim100.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
-
-class SesionViewModel : ViewModel()
+typealias SesionViewModel = com.example.wim100.viewmodel.SesionViewModel

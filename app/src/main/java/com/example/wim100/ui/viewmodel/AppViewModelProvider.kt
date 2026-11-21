@@ -1,3 +1,3 @@
 package com.example.wim100.ui.viewmodel
 
-class AppViewModelProvider 
+typealias AppViewModelProvider = com.example.wim100.viewmodel.AppViewModelFactory
