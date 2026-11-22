@@ -2,9 +2,12 @@ package com.example.wim100.data.repository
 
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
-import com.example.wim100.data.local.WimDatabase
 import com.example.wim100.data.local.CandidataConEvaluaciones
-import com.example.wim100.validation.EvaluacionValidator
+import com.example.wim100.data.local.WimDatabase
+import com.example.wim100.data.remote.EvaluacionDto
+import com.example.wim100.data.remote.PuntajeDto
+import com.example.wim100.data.remote.RetrofitClient
+import com.example.wim100.data.remote.WimApi
 import com.example.wim100.model.Acciones
 import com.example.wim100.model.CalculadoraPuntaje
 import com.example.wim100.model.Criterio
@@ -15,13 +18,15 @@ import com.example.wim100.model.PuntajeCriterio
 import com.example.wim100.model.ResultadoConsolidado
 import com.example.wim100.model.Rol
 import com.example.wim100.model.Sesion
+import com.example.wim100.validation.EvaluacionValidator
 import kotlinx.coroutines.flow.Flow
 
 class EvaluacionDuplicadaException(mensaje: String) : Exception(mensaje)
 
 class EvaluacionRepository(
     private val db: WimDatabase,
-    private val historial: HistorialRepository
+    private val historial: HistorialRepository,
+    private val api: WimApi = RetrofitClient.wimApi
 ) {
     private val evaluacionDao = db.evaluacionDao()
     private val criterioDao = db.criterioDao()
@@ -61,9 +66,7 @@ class EvaluacionRepository(
         val clave = Evaluacion.normalizarClave(evaluadora)
 
         try {
-            // withTransaction (si algo de aquí falla, no se guarda nada a medias)
             return db.withTransaction {
-
                 val candidata = candidataDao.obtenerPorId(candidataId)
                     ?: error("La candidatura no existe")
                 check(!candidata.estado.estaResuelta) { "La candidatura ya fue resuelta" }
@@ -71,24 +74,22 @@ class EvaluacionRepository(
                 val validacionGeneral = EvaluacionValidator.validarObservacionGeneral(observacionGeneral)
                 require(validacionGeneral.esValido) { validacionGeneral.mensaje.orEmpty() }
 
-                // 1. Verifica que no sea duplicada
                 if (evaluacionDao.contarPorCandidata(candidataId) > 0) {
                     throw EvaluacionDuplicadaException("Esta candidata ya tiene una evaluación. Su responsable puede editarla.")
                 }
 
-                // 2. Calcula la nota
                 val criterios = criterioDao.obtenerTodos()
                 check(criterios.isNotEmpty()) { "Espera a que se carguen los criterios" }
                 for (criterio in criterios) {
                     val nota = EvaluacionValidator.validarPuntaje(puntajes[criterio.id])
                     require(nota.esValido) { "${criterio.nombre}: ${nota.mensaje}" }
                     val observacion = EvaluacionValidator.validarObservacionCriterio(
-                        puntajes[criterio.id], observaciones[criterio.id].orEmpty())
+                        puntajes[criterio.id], observaciones[criterio.id].orEmpty()
+                    )
                     require(observacion.esValido) { "${criterio.nombre}: ${observacion.mensaje}" }
                 }
                 val total = CalculadoraPuntaje.calcular(criterios, puntajes)
 
-                // 3. Guarda la evaluación
                 val evaluacionId = evaluacionDao.insertar(
                     Evaluacion(
                         candidataId = candidataId,
@@ -99,7 +100,6 @@ class EvaluacionRepository(
                     )
                 )
 
-                // 4. Guarda los puntajes 1 a 5 de los criterios
                 val listaPuntajes = criterios.map { c ->
                     PuntajeCriterio(
                         evaluacionId = evaluacionId,
@@ -110,9 +110,7 @@ class EvaluacionRepository(
                 }
                 evaluacionDao.insertarPuntajes(listaPuntajes)
 
-                // 5. Una evaluación completa permite pasar a Evaluada.
                 val cantidadEvaluaciones = evaluacionDao.contarPorCandidata(candidataId)
-
                 val nuevoEstado = if (cantidadEvaluaciones >= Evaluacion.MINIMO_PARA_CONSOLIDAR) {
                     EstadoCandidatura.EVALUADA
                 } else {
@@ -120,10 +118,9 @@ class EvaluacionRepository(
                 }
                 candidataDao.actualizarEstado(candidataId, nuevoEstado)
 
-                // 6. Registro al historial
                 historial.registrar(candidataId, Acciones.EVALUACION, "Evaluación registrada", evaluadora)
 
-                total // Se retorna la nota final
+                total
             }
         } catch (e: EvaluacionDuplicadaException) {
             historial.registrar(candidataId, Acciones.INTENTO_DUPLICADO, "El sistema bloqueó un duplicado", evaluadora)
@@ -136,8 +133,12 @@ class EvaluacionRepository(
     }
 
     suspend fun actualizar(
-        candidataId: Long, sesion: Sesion, revisionEsperada: Int,
-        puntajes: Map<Long, Int>, observaciones: Map<Long, String>, observacionGeneral: String
+        candidataId: Long,
+        sesion: Sesion,
+        revisionEsperada: Int,
+        puntajes: Map<Long, Int>,
+        observaciones: Map<Long, String>,
+        observacionGeneral: String
     ): Double = db.withTransaction {
         require(sesion.rol == Rol.EVALUADORA) { "Solo la evaluadora responsable puede editar" }
         val candidata = candidataDao.obtenerPorId(candidataId) ?: error("La candidatura no existe")
@@ -164,15 +165,102 @@ class EvaluacionRepository(
         }
         evaluacionDao.eliminarPuntajes(anterior.id)
         evaluacionDao.insertarPuntajes(criterios.map { c ->
-            PuntajeCriterio(evaluacionId = anterior.id, criterioId = c.id,
-                puntaje = checkNotNull(puntajes[c.id]), observacion = observaciones[c.id].orEmpty())
+            PuntajeCriterio(
+                evaluacionId = anterior.id,
+                criterioId = c.id,
+                puntaje = checkNotNull(puntajes[c.id]),
+                observacion = observaciones[c.id].orEmpty()
+            )
         })
         val cambios = criterios.joinToString(" | ") { c ->
             "${c.nombre}: ${anteriores[c.id]?.puntaje} → ${puntajes[c.id]}. " +
-                "Justificación anterior: ${anteriores[c.id]?.observacion.orEmpty()}. Nueva: ${observaciones[c.id].orEmpty()}"
+                    "Justificación anterior: ${anteriores[c.id]?.observacion.orEmpty()}. Nueva: ${observaciones[c.id].orEmpty()}"
         }
-        historial.registrar(candidataId, Acciones.EDICION_EVALUACION,
-            "Total: ${anterior.puntajeTotal} → $total. $cambios. Observación anterior: ${anterior.observacionGeneral}. Nueva: $observacionGeneral", sesion.nombre)
+        historial.registrar(
+            candidataId,
+            Acciones.EDICION_EVALUACION,
+            "Total: ${anterior.puntajeTotal} → $total. $cambios. Observación anterior: ${anterior.observacionGeneral}. Nueva: $observacionGeneral",
+            sesion.nombre
+        )
         total
+    }
+
+    suspend fun enviarAlServidor(
+        candidataId: Long,
+        evaluadora: String,
+        puntajes: Map<Long, Int>,
+        observaciones: Map<Long, String>,
+        observacionGeneral: String
+    ) {
+        val criterios = criterioDao.obtenerTodos()
+        val total = CalculadoraPuntaje.calcular(criterios, puntajes)
+        val dto = EvaluacionDto(
+            postulanteId = candidataId,
+            evaluadora = evaluadora.trim(),
+            evaluadoraClave = Evaluacion.normalizarClave(evaluadora),
+            puntajeTotal = total,
+            observacionGeneral = observacionGeneral.trim(),
+            fecha = System.currentTimeMillis(),
+            puntajes = criterios.map { c ->
+                PuntajeDto(
+                    criterioId = c.id,
+                    puntaje = puntajes[c.id] ?: 0,
+                    justificacion = observaciones[c.id].orEmpty().trim()
+                )
+            }
+        )
+        api.guardarEvaluacion(dto)
+    }
+
+    suspend fun sincronizarDesdeServidor() {
+        val remotas = api.listarEvaluaciones()
+        db.withTransaction {
+            val criterios = criterioDao.obtenerTodos()
+            if (criterios.isEmpty()) return@withTransaction
+
+            for (dto in remotas) {
+                val candidata = candidataDao.obtenerPorId(dto.postulanteId) ?: continue
+                val existente = evaluacionDao.obtenerPorCandidata(dto.postulanteId)
+
+                val evaluacionId = if (existente == null) {
+                    evaluacionDao.insertar(
+                        Evaluacion(
+                            candidataId = dto.postulanteId,
+                            evaluadora = dto.evaluadora,
+                            evaluadoraClave = dto.evaluadoraClave,
+                            puntajeTotal = dto.puntajeTotal,
+                            observacionGeneral = dto.observacionGeneral,
+                            fecha = dto.fecha
+                        )
+                    )
+                } else {
+                    evaluacionDao.actualizar(
+                        id = existente.id,
+                        total = dto.puntajeTotal,
+                        observacion = dto.observacionGeneral,
+                        fecha = dto.fecha,
+                        revision = existente.revision
+                    )
+                    evaluacionDao.eliminarPuntajes(existente.id)
+                    existente.id
+                }
+
+                val listaPuntajes = dto.puntajes.map { p ->
+                    PuntajeCriterio(
+                        evaluacionId = evaluacionId,
+                        criterioId = p.criterioId,
+                        puntaje = p.puntaje,
+                        observacion = p.justificacion
+                    )
+                }
+                if (listaPuntajes.isNotEmpty()) {
+                    evaluacionDao.insertarPuntajes(listaPuntajes)
+                }
+
+                if (!candidata.estado.estaResuelta && candidata.estado != EstadoCandidatura.EVALUADA) {
+                    candidataDao.actualizarEstado(dto.postulanteId, EstadoCandidatura.EVALUADA)
+                }
+            }
+        }
     }
 }

@@ -1,14 +1,21 @@
 package com.example.wim100.viewmodel
+
 import com.example.wim100.validation.FormularioValidator
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FormularioValidatorTest {
+
     @Test
     fun nombreVacioMuestraError() {
         val resultado = FormularioValidator.validarNombre("")
         assertEquals("El nombre es obligatorio", resultado)
     }
+
     @Test
     fun nombreMuyCortoMuestraError() {
         val resultado = FormularioValidator.validarNombre("Jo")
@@ -17,11 +24,13 @@ class FormularioValidatorTest {
             resultado
         )
     }
+
     @Test
     fun nombreValidoNoTieneErrores() {
         val resultado = FormularioValidator.validarNombre("Johaquin")
         assertNull(resultado)
     }
+
     @Test
     fun correoInvalidoMuestraError() {
         val resultado = FormularioValidator.validarCorreo("correoincorrecto")
@@ -30,6 +39,7 @@ class FormularioValidatorTest {
             resultado
         )
     }
+
     @Test
     fun correoValidoNoTieneErrores() {
         val resultado = FormularioValidator.validarCorreo(
@@ -37,6 +47,7 @@ class FormularioValidatorTest {
         )
         assertNull(resultado)
     }
+
     @Test
     fun telefonoCortoMuestraError() {
         val resultado = FormularioValidator.validarTelefono("1234")
@@ -45,6 +56,7 @@ class FormularioValidatorTest {
             resultado
         )
     }
+
     @Test
     fun telefonoValidoNoTieneErrores() {
         val resultado = FormularioValidator.validarTelefono(
@@ -52,6 +64,7 @@ class FormularioValidatorTest {
         )
         assertNull(resultado)
     }
+
     @Test
     fun formularioCompletoEsValido() {
         val errores = FormularioValidator.validarFormulario(
@@ -61,6 +74,7 @@ class FormularioValidatorTest {
         )
         assertFalse(errores.hayErrores)
     }
+
     @Test
     fun formularioVacioTieneErrores() {
         val errores = FormularioValidator.validarFormulario(
@@ -70,6 +84,7 @@ class FormularioValidatorTest {
         )
         assertTrue(errores.hayErrores)
     }
+
     @Test
     fun correoRealNoSeAceptaEnElMvpAcademico() {
         assertNotNull(FormularioValidator.validarCorreo("usuario@gmail.com"))
