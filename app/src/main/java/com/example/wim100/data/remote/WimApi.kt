@@ -44,4 +44,12 @@ interface WimApi {
     suspend fun eliminarPostulante(
         @Path("id") id: Long
     )
+
+    @GET("evaluaciones")
+    suspend fun listarEvaluaciones(): List<EvaluacionDto>
+
+    @POST("evaluaciones")
+    suspend fun guardarEvaluacion(
+        @Body request: EvaluacionDto
+    ): EvaluacionDto
 }

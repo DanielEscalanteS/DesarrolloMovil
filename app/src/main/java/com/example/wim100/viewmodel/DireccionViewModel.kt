@@ -3,24 +3,23 @@ package com.example.wim100.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.wim100.data.remote.mensajeParaUsuario
-import com.example.wim100.data.repository.HistorialRepository
-import com.example.wim100.model.Acciones
-import com.example.wim100.model.CriteriosDemostracion
-import com.example.wim100.model.Rol
-import com.example.wim100.model.Evaluacion
 import com.example.wim100.data.repository.CandidataRepository
 import com.example.wim100.data.repository.EvaluacionRepository
-import com.example.wim100.model.EstadoCandidatura
-import com.example.wim100.model.Sesion
+import com.example.wim100.data.repository.HistorialRepository
+import com.example.wim100.model.Acciones
 import com.example.wim100.model.ComparacionCandidatas
+import com.example.wim100.model.CriteriosDemostracion
+import com.example.wim100.model.EstadoCandidatura
+import com.example.wim100.model.Evaluacion
+import com.example.wim100.model.Rol
+import com.example.wim100.model.Sesion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -56,7 +55,6 @@ class DireccionViewModel(
         .catch { _error.value = "No se pudieron consultar los puntajes"; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Se conecta al Flow del DAO que trae el ranking
     val rankingConsolidado = evaluacionRepository.observarConsolidado()
         .onEach { _cargando.value = false }
         .catch {
@@ -67,15 +65,22 @@ class DireccionViewModel(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList() // Empieza como lista vacía mientras carga
+            initialValue = emptyList()
         )
 
     val listado = combine(rankingConsolidado, fichas, filtros) { ranking, detalles, filtro ->
-        val filtradas = ranking.filter { (filtro.estado == null || it.estado == filtro.estado) &&
-            (filtro.area == null || it.area == filtro.area) }
-        val puntajes = if (filtro.criterioId == null) ranking.associate { it.candidataId to it.promedio }
-        else detalles.associate { ficha -> ficha.candidata.id to ficha.evaluaciones.singleOrNull()
-            ?.puntajes?.find { it.criterioId == filtro.criterioId }?.puntaje?.toDouble() }
+        val filtradas = ranking.filter {
+            (filtro.estado == null || it.estado == filtro.estado) &&
+                    (filtro.area == null || it.area == filtro.area)
+        }
+        val puntajes = if (filtro.criterioId == null) {
+            ranking.associate { it.candidataId to it.promedio }
+        } else {
+            detalles.associate { ficha ->
+                ficha.candidata.id to ficha.evaluaciones.singleOrNull()
+                    ?.puntajes?.find { it.criterioId == filtro.criterioId }?.puntaje?.toDouble()
+            }
+        }
         ComparacionCandidatas.ordenar(filtradas, puntajes, filtro.ascendente)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -91,11 +96,17 @@ class DireccionViewModel(
             try {
                 evaluacionRepository.asegurarCriterios(CriteriosDemostracion.lista)
                 candidataRepository.sincronizarDesdeServidor()
+                evaluacionRepository.sincronizarDesdeServidor()
                 datosActualizados = true
                 _mensaje.value = null
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { _mensaje.value = e.mensajeParaUsuario() }
-            finally { refrescando = false; _guardando.value = false }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _mensaje.value = e.mensajeParaUsuario()
+            } finally {
+                refrescando = false
+                _guardando.value = false
+            }
         }
     }
 
@@ -118,7 +129,6 @@ class DireccionViewModel(
 
     fun limpiarSeleccion() { _seleccionadas.value = emptyList(); _mensaje.value = null }
 
-    // Función para que el Director presione "Seleccionada" o "No seleccionada"
     fun resolverCandidatura(candidataId: Long, nuevoEstado: EstadoCandidatura, sesion: Sesion) {
         if (_guardando.value) return
         _guardando.value = true
@@ -128,17 +138,24 @@ class DireccionViewModel(
                 require(sesion.rol == Rol.DIRECCION) { "Solo Dirección puede resolver candidaturas" }
                 require(nuevoEstado.estaResuelta) { "Selecciona una resolución válida" }
                 val ficha = evaluacionRepository.obtenerFicha(candidataId) ?: error("La candidatura no existe")
-                check(ficha.candidata.estado == EstadoCandidatura.EVALUADA &&
-                    ficha.evaluaciones.size >= Evaluacion.MINIMO_PARA_CONSOLIDAR) {
+                check(
+                    ficha.candidata.estado == EstadoCandidatura.EVALUADA &&
+                            ficha.evaluaciones.size >= Evaluacion.MINIMO_PARA_CONSOLIDAR
+                ) {
                     "La candidatura debe estar evaluada y no resuelta"
                 }
                 candidataRepository.cambiarEstadoEnServidor(candidataId, nuevoEstado)
                 try {
-                    historialRepository.registrar(candidataId, Acciones.RESOLUCION,
-                        "Candidatura marcada como ${nuevoEstado.etiqueta}", sesion.nombre)
+                    historialRepository.registrar(
+                        candidataId, Acciones.RESOLUCION,
+                        "Candidatura marcada como ${nuevoEstado.etiqueta}", sesion.nombre
+                    )
                     _mensaje.value = "Resolución guardada"
-                } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { _mensaje.value = "Resolución guardada; no se pudo registrar el historial" }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _mensaje.value = "Resolución guardada; no se pudo registrar el historial"
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
