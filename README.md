@@ -1,4 +1,4 @@
-# WIM100 — Aplicación Android
+# WIM100 - Aplicación de Android (Frontend)
 
 WIM100 es un proyecto académico para registrar y evaluar candidatas del área de ciberseguridad. Reúne sus antecedentes, permite asignar notas mediante una matriz ponderada y entrega a Dirección herramientas para comparar perfiles y resolver candidaturas.
 
