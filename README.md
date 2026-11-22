@@ -7,9 +7,11 @@ La aplicación se desarrolla sobre la base del equipo con Kotlin, Jetpack Compos
 | Repositorio | Responsabilidad |
 | --- | --- |
 | [DesarrolloMovil](https://github.com/DanielEscalanteS/DesarrolloMovil) | Aplicación Android, evaluación, comparación y persistencia local. |
-| [wim100-backend](https://github.com/BastianHuenchullan/wim100-backend) | API REST, postulantes, usuarios y validación de credenciales. |
+| [wim100-backend](https://github.com/BastianHuenchullan/wim100-backend) | API REST, postulantes, usuarios, evaluaciones y puntajes por criterio. |
 
-Esta documentación corresponde a la versión integrada de trabajo. Hasta publicar y fusionar sus cambios, la rama principal puede contener una versión anterior.
+Esta documentación corresponde al frontend `main`, commit `6e1b4ea61c42f77784b4a858428f1e531b1696a5`, que integra `fix/dtos-y-tests` mediante el PR #8. El backend compatible también está en `main`, commit `587859c`, que incluye la integración de `fix/actualizacion-api` mediante el PR #2. Por tanto, las evaluaciones remotas y los ajustes de DTOs y pruebas ya forman parte de las ramas principales.
+
+**Última actualización documental:** 22 de noviembre de 2026. Las modificaciones que solo existan en un computador y no estén publicadas no forman parte de esta referencia.
 
 ## Contenido
 
@@ -29,6 +31,9 @@ Esta documentación corresponde a la versión integrada de trabajo. Hasta public
 14. [Solución de problemas](#14-solución-de-problemas)
 15. [Alcance actual y pendientes](#15-alcance-actual-y-pendientes)
 16. [Trabajo colaborativo](#16-trabajo-colaborativo)
+17. [Evaluaciones remotas](#17-evaluaciones-remotas)
+18. [Emulador y teléfono por USB](#18-emulador-y-teléfono-conectados-por-usb)
+19. [Correspondencia con la evaluación](#19-correspondencia-con-la-evaluación)
 
 ## 1. Objetivo y alcance
 
@@ -137,7 +142,7 @@ Cerrar sesión retira la navegación del equipo. Atrás no debe permitir volver 
 - Una revisión desactualizada exige volver a abrir la evaluación.
 - Una candidatura seleccionada o no seleccionada bloquea nuevas evaluaciones y la modificación de su evaluación.
 
-Estas reglas se aplican a la base local. No existe unicidad global entre dispositivos porque sus evaluaciones todavía no se almacenan en el backend.
+Estas reglas se aplican a la base local. El backend nuevo almacena evaluaciones, pero busca por `postulanteId` y `evaluadoraClave`: otra evaluadora puede crear otra fila para la misma candidata. Por tanto, la regla de una evaluación por candidata todavía no está garantizada entre dispositivos. La edición remota tampoco recibe una revisión esperada.
 
 ### Matriz académica configurada
 
@@ -202,7 +207,7 @@ Los valores JSON coinciden exactamente con `EstadoCandidatura` en Android y `Est
 | `SELECCIONADA` | Resolución favorable. |
 | `NO_SELECCIONADA` | Resolución de no selección. |
 
-Abrir la evaluación no envía automáticamente `EN_EVALUACION`. Guardar una evaluación completa registra las notas en Room y sincroniza `EVALUADA` con el backend.
+Abrir la evaluación no envía automáticamente `EN_EVALUACION`. Guardar registra las notas en Room, envía la evaluación y sus puntajes a `POST /api/evaluaciones` y luego actualiza `EVALUADA` mediante PATCH. Son operaciones separadas.
 
 Para resolver desde Dirección se exige refresco correcto, estado `EVALUADA`, evaluación local disponible y ausencia de resolución previa. Se envía el estado al servidor y se registra la acción localmente. No existe un puntaje mínimo automático para seleccionar.
 
@@ -297,7 +302,7 @@ Los DAOs emiten `Flow` al cambiar los datos. Los ViewModels lo combinan con esta
 | Usuarios y contraseñas BCrypt | MySQL del backend. | Login contra el mismo servidor. |
 | Postulantes y estado | MySQL y copia sincronizada en Room. | Se consultan al refrescar. |
 | Criterios | Room, inicializados con la matriz de la app. | No se descargan del backend. |
-| Evaluaciones y notas | Room. | No se comparten. |
+| Evaluaciones y notas | Room y MySQL mediante `/api/evaluaciones`. | Dirección las descarga al refrescar. El refresco de Evaluadora todavía no las descarga. |
 | Historial | Room. | No se comparte. |
 | PDF y `cvUri` | Archivos privados y referencia local en Room. | No se comparten. |
 | `cvNombre` | Backend y copia local. | Se comparte el nombre, no el archivo. |
@@ -319,7 +324,9 @@ El DAO utiliza `@Upsert` para actualizar respuestas remotas sin reemplazar destr
 
 Si falla el refresco, se conserva el listado local y se informa el error. Las pantallas bloquean las acciones que exigen un refresco correcto según su flujo. No existe una cola general de operaciones sin conexión.
 
-Una evaluación se guarda primero en una transacción local. Después se sincroniza su estado. Si falla ese envío, la pantalla permite reintentarlo sin registrar otra evaluación. Ese indicador está en memoria: no es una cola persistente que se ejecute automáticamente al reiniciar.
+Una evaluación se guarda primero en una transacción local. Después `enviarAlServidor()` envía las notas y `cambiarEstadoEnServidor()` actualiza el estado. Si falla el envío, la pantalla permite reintentarlo sin registrar otra evaluación local. Ese indicador está en memoria: no es una cola persistente que se ejecute automáticamente al reiniciar.
+
+`DireccionViewModel.refrescar()` descarga postulantes y evaluaciones. `CandidatasViewModel.refrescar()` descarga solo postulantes. La copia de evaluaciones actualiza las notas locales, pero utiliza un método que incrementa `revision` incluso al refrescar; tampoco actualiza la identidad de la evaluadora de una fila ya existente. Estos puntos deben corregirse antes de garantizar edición y sincronización entre teléfonos.
 
 ### Migración y ejemplos
 
@@ -361,8 +368,10 @@ Retrofit y Gson se configuran en `data/remote/RetrofitClient.kt`. `WimApi.kt` de
 | PATCH | `/api/postulantes/{id}/estado` | 200, 400 por cuerpo inválido o 404. |
 | DELETE | `/api/postulantes/{id}` | 204 sin cuerpo, o 404. |
 | POST | `/api/auth/login` | 200, 400 por campos vacíos o 401 por credenciales incorrectas. |
+| GET | `/api/evaluaciones` | 200, evaluaciones con sus notas. |
+| POST | `/api/evaluaciones` | 200, alta o actualización según postulante y evaluadora. |
 
-Son siete operaciones HTTP. La colección Postman del backend tiene nueve solicitudes porque incluye escenarios de error.
+A las siete operaciones originales se agregaron dos: `GET /api/evaluaciones` y `POST /api/evaluaciones`, ambas con respuesta 200. Son nueve operaciones HTTP en total. La colección Postman todavía contiene nueve solicitudes para el contrato original; no incluye los endpoints nuevos.
 
 ### Campos de `PostulanteDto`
 
@@ -395,7 +404,7 @@ La respuesta contiene `id`, `usuario`, `nombre` y `rol`, sin token. Cambio de es
 {"estado": "EVALUADA"}
 ```
 
-`Errores.kt` interpreta `status`, `mensaje` y `errores` del servidor; si no puede leer ese formato, usa el código HTTP o un mensaje de conexión. El contrato no incluye endpoints de notas, criterios, historial o archivos. LinkedIn se guarda como enlace: no se extrae su perfil.
+`Errores.kt` interpreta `status`, `mensaje` y `errores` del servidor; si no puede leer ese formato, usa el código HTTP o un mensaje de conexión. Los puntajes y sus justificaciones viajan dentro de la evaluación. El contrato no incluye endpoints para administrar la definición de criterios, historial o archivos. LinkedIn se guarda como enlace: no se extrae su perfil.
 
 ## 9. API externa RandomUser
 
@@ -488,7 +497,16 @@ git clone https://github.com/DanielEscalanteS/DesarrolloMovil.git
 cd DesarrolloMovil
 ```
 
-1. Utilizar la rama que contenga la integración del equipo. La rama de trabajo de esta integración es `feature/ui-viewmodels-api`; conservar cambios locales antes de cambiar de rama.
+1. Utilizar la rama que contenga la integración del equipo. La rama actual es `main`, que ya contiene la integración de `fix/dtos-y-tests`; conservar cambios locales antes de actualizar o cambiar de rama. Para una copia limpia:
+
+   ```powershell
+   git status
+   git fetch origin
+   git switch main
+   git pull --ff-only origin main
+   ```
+
+   Si `git status` muestra cambios propios, conservarlos antes de cambiar de rama. No utilizar comandos de descarte para resolver ese aviso.
 2. Abrir en Android Studio la raíz con `settings.gradle.kts`, `gradlew.bat` y `app`. No abrir solo `app` ni el repositorio del backend.
 3. Sincronizar y seleccionar JDK 21 para Gradle.
 4. Instalar Android SDK 37 y seleccionar un emulador compatible.
@@ -516,7 +534,7 @@ Cambiar `WIM_BASE_URL` por la IP del computador conservando `:8080/api/`, y comp
 
 ## 12. Pruebas automatizadas
 
-En la verificación del **21 de noviembre de 2026**, `:app:testDebugUnitTest` y `:app:assembleDebug` finalizaron correctamente: **79 pruebas unitarias, cero fallos, cero errores y cero omitidas**. Se conservaron 35 anteriores y se agregaron 44 en los seis archivos de integración de ViewModels.
+En la verificación del **22 de noviembre de 2026**, sobre `c563f5c`, `:app:testDebugUnitTest` y `:app:assembleDebug` finalizaron correctamente: **79 pruebas unitarias, cero fallos, cero errores y cero omitidas**. El `main` actual, `6e1b4ea`, tiene el mismo árbol de archivos que ese commit: el PR #8 incorporó sus cambios sin modificar el contenido. Los archivos de pruebas se conservan; se renombraron casos para facilitar su lectura. No se presenta la fusión como una nueva ejecución de pruebas.
 
 | Archivo en `app/src/test/java/com/example/wim100/` | Casos | Alcance |
 | --- | --- | --- |
@@ -553,7 +571,7 @@ Los casos aprobados no acreditan un porcentaje de cobertura. Para evaluar la met
 
 ## 13. Comprobación manual
 
-Usar **la misma instalación** para evaluar y consultar desde Dirección: las notas son locales. Mantener backend y MySQL activos salvo al probar desconexiones.
+Mantener backend y MySQL activos salvo al probar desconexiones. Para la demostración entre dispositivos: evaluar desde el primero, completar el envío, ingresar como Dirección en el segundo y refrescar postulantes y evaluaciones. El refresco de Evaluadora en otro dispositivo todavía no descarga esas evaluaciones.
 
 | Caso | Acción y resultado esperado |
 | --- | --- |
@@ -599,7 +617,7 @@ Registrar dos candidatas con PDF de prueba. Cambiar los números del correo si y
 
 Asignar inicialmente todas las notas en 4 a Ana y en 5 a Beatriz, con observaciones generales válidas: deben producir 80 y 100. Después usar notas variadas para demostrar las ayudas visuales, justificando las bajas.
 
-El equipo informó que completó satisfactoriamente los bloques manuales y casos adicionales durante esta revisión. Para la entrega formal, conservar la evidencia solicitada por la pauta; este README no incluye capturas o grabaciones de esos recorridos.
+El equipo informó verificaciones manuales satisfactorias de la interfaz y del flujo previo. Los escenarios nuevos entre dispositivos se presentan como plan de comprobación; no se incluyen capturas ni una ejecución completa acreditada de esos escenarios.
 
 ## 14. Solución de problemas
 
@@ -611,25 +629,26 @@ El equipo informó que completó satisfactoriamente los bloques manuales y casos
 | Dirección bloqueada | Credenciales y huella o bloqueo compatible configurado. |
 | Correo rechazado | Formato, dominio ficticio admitido y duplicados. |
 | PDF de ejemplo ausente | El servidor solo tiene su nombre; probar con un archivo adjuntado en esa instalación. |
-| Otro dispositivo no muestra notas | Las evaluaciones e historial son locales. |
+| Otro dispositivo no muestra notas | Entrar como Dirección y refrescar. Evaluadora todavía no descarga evaluaciones; el historial es local. |
 | Conflicto de ID o correo | Comparar datos locales y remotos, especialmente después de ejemplos antiguos. |
 | No permite resolver | Refrescar y comprobar estado EVALUADA y evaluación local disponible. |
 | Evaluación guardada sin sincronizar | Reintentar el estado desde la pantalla, sin crear otra evaluación. |
 | Actividad inexistente al ejecutar | Sincronizar y usar actividad predeterminada del módulo app. La actividad es `com.example.wim100.MainActivity` y el applicationId es `com.example.appsemestral`: son identificadores diferentes y válidos. |
 
-Antes de reinstalar o borrar datos, considerar que notas, historial y PDF locales no se recuperan desde MySQL.
+Antes de reinstalar o borrar datos, considerar que historial y PDF locales no se recuperan desde MySQL. Solo las evaluaciones cuyo envío terminó correctamente pueden descargarse desde el backend, mediante el refresco de Dirección implementado en esta versión.
 
 ## 15. Alcance actual y pendientes
 
 La versión permite completar el recorrido académico en un dispositivo. Sus límites actuales son:
 
-- Evaluaciones e historial locales, sin endpoints para compartir detalles. Un estado remoto EVALUADA no entrega las notas a otro teléfono.
+- Evaluaciones y puntajes ya tienen endpoints remotos; la descarga todavía no se ejecuta en el refresco de Evaluadora. El historial y la definición de criterios siguen locales, de acuerdo con la arquitectura híbrida permitida por la guía.
 - Login con BCrypt, pero sin tokens ni autorización por rol en el CRUD remoto. Las reglas de resolución se verifican en Android.
 - Sin carga o descarga remota de PDF; se comparte únicamente su nombre.
 - El refresco incorpora y actualiza, pero no retira automáticamente los registros borrados por otro cliente.
 - Diferencias de ID y correo detienen el refresco. Un correo cambiado desde otro cliente puede activar este control.
 - Sin transacción distribuida entre backend, copia local e historial: una operación remota podría completarse antes de fallar el paso local. Revisar el servidor antes de repetir un alta dudosa.
-- Sin cola persistente de reintentos, sincronización automática de notas ni recuperación de borradores tras cerrar el proceso.
+- Sin cola persistente de reintentos, sincronización automática general ni recuperación de borradores tras cerrar el proceso.
+- El backend no valida todas las reglas de las evaluaciones ni garantiza una evaluación única por candidata. Recibe el total calculado por el cliente y guarda evaluación y puntajes mediante operaciones separadas.
 - Algunos límites máximos de validación existen solo en el backend.
 - La validación documentada acredita APK debug y pruebas unitarias, no APK release firmado ni 80 % de cobertura.
 
@@ -645,6 +664,80 @@ Integrantes:
 
 Se trabaja por ramas, con commits en español y pull requests hacia `main`. La integración conserva la base del equipo y añade las conexiones necesarias. Cada funcionalidad debe acompañarse de sus pruebas; navegación y fábrica de ViewModels requieren coordinación por ser archivos compartidos.
 
-Al publicar, incluir código, pruebas y README. Los ZIP de intercambio, reportes locales, `local.properties`, compilaciones y credenciales privadas no forman parte del cambio de código. La firma final del APK se coordina con su responsable.
+Al publicar, incluir código, pruebas y README. Los bundles de intercambio, `local.properties` y cachés no forman parte del cambio de código. La guía solicita además evidencia de cobertura, APK release y JKS académico; coordinar su incorporación con el responsable de la firma.
 
-**Última revisión:** 21 de noviembre de 2026. Integración Android de trabajo y backend `main` en `6ca31d3c14eb1cd744a46b6bb4bafb314420cdb6`.
+**Versión revisada:** Android `main` en `6e1b4ea` y backend `main` en `587859c`, consultados el 22 de noviembre de 2026. Los cambios funcionales provienen de `c563f5c` y `fda0e48`, respectivamente.
+
+
+## 17. Evaluaciones remotas
+
+`Dtos.kt` incorpora `EvaluacionDto` y `PuntajeDto`. Cada puntaje incluye `criterioId`, `puntaje` y `justificacion`. La definición del criterio (nombre, descripción, peso y orden) procede de `CriteriosDemostracion.kt` y Room; no se descarga de MySQL.
+
+- `GET /api/evaluaciones`: lista evaluaciones con sus puntajes.
+- `POST /api/evaluaciones`: crea o actualiza según postulante y clave de evaluadora; devuelve 200.
+- `EvaluacionRepository.enviarAlServidor()`: prepara el DTO y realiza el POST.
+- `EvaluacionRepository.sincronizarDesdeServidor()`: incorpora notas recibidas en Room.
+
+No hay PUT, DELETE ni consulta por ID de evaluación en este contrato. La edición utiliza el mismo POST. No existe sincronización en tiempo real.
+
+## 18. Emulador y teléfono conectados por USB
+
+La URL publicada sigue siendo `http://10.0.2.2:8080/api/`, válida para Android Emulator. Para usar una misma compilación en emulador y teléfono mediante USB:
+
+1. En `RetrofitClient.kt`, cambiar el valor de la declaración existente de `WIM_BASE_URL` a `http://127.0.0.1:8080/api/`. Debe existir una sola declaración.
+2. Mantener MySQL y backend activos en el computador.
+3. En PowerShell, listar dispositivos:
+
+```powershell
+$adb = "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb devices
+```
+
+4. Copiar los identificadores mostrados y ejecutar, sustituyendo los textos de ejemplo:
+
+```powershell
+& $adb -s "ID_TELEFONO" reverse tcp:8080 tcp:8080
+& $adb -s "ID_EMULADOR" reverse tcp:8080 tcp:8080
+& $adb -s "ID_TELEFONO" reverse --list
+& $adb -s "ID_EMULADOR" reverse --list
+.\gradlew.bat :app:installDebug
+```
+
+5. Abrir la app en ambos. Repetir el mapeo si se pierde al desconectar o reiniciar. Este ajuste de conexión no sincroniza datos que continúan siendo locales.
+
+## 19. Correspondencia con la evaluación
+
+El checklist EP4 de `Guia_Backend_WIM100.docx` distribuye los indicadores así:
+
+| Indicador | Peso | Implementación y evidencia |
+| --- | --- | --- |
+| IE 3.1.1 Interfaz | 15 % | Pantallas y navegación implementadas; adjuntar capturas y demostración. |
+| IE 3.1.2 Microservicio | 15 % | Spring Boot y MySQL, CRUD y login; compilación del backend comprobada, demostración HTTP/MySQL por registrar. |
+| IE 3.1.3 Integración | 15 % | Retrofit para CRUD y estados; conservar evidencia de su reflejo en MySQL. |
+| IE 3.1.4 API externa | 15 % | RandomUser desde el formulario de Evaluadora; demostrar éxito y fallo sin bloquear escritura manual. |
+| IE 3.2.1 Pruebas | 15 % | 79 pruebas unitarias aprobadas. Medición de cobertura por paquete y ampliación de tests de Repository pendientes. |
+| IE 3.3.1 APK firmado | 10 % | APK debug generado. APK release, JKS académico, configuración de firma y evidencias pendientes. |
+| IE 3.3.2 GitHub y Trello | 15 % | Tres integrantes y dos repositorios; las integraciones recientes ya están en main. Mantener el tablero y las evidencias de aportes actualizados. |
+
+La guía permite mantener criterios e historial en Room. Centralizarlos sería una ampliación del alcance y no se considera un requisito pendiente de ese diseño. Los pesos anteriores corresponden al checklist de la guía del profesor.
+
+### Cobertura y firma para la entrega
+
+La cobertura se revisa en los paquetes de lógica `model`, `validation`, `data/repository` y los ViewModels activos de `viewmodel/`. La guía usa `ui/viewmodel` en sus ejemplos; en este proyecto la lógica activa está en `com.example.wim100.viewmodel`. Usar Run with Coverage en Android Studio y conservar el reporte por paquete. El número de pruebas no demuestra por sí solo un 80 % de cobertura.
+
+Para la firma, usar Build > Generate Signed App Bundle or APK > APK, crear una llave académica exclusiva y generar la variante release. La guía solicita configuración `signingConfigs`, el APK, el archivo JKS y sus capturas. En el código revisado todavía no está configurada esa firma. Después de configurarla:
+
+```powershell
+.\gradlew.bat :app:assembleRelease
+```
+
+Verificar el archivo resultante con `apksigner verify --print-certs RUTA_DEL_APK_RELEASE`, usando la herramienta de Android SDK/build-tools. Adjuntar las evidencias reales cuando existan; no confundir la firma debug con la release.
+
+### Fuentes y planificación
+
+- `Guia_Backend_WIM100.docx`: arquitectura híbrida, contrato, checklist EP4 y documentación de los pasos 16 y 37.
+- `Guia_Estudiantes_DSY1105_WIM100.docx`: requisitos de interfaz, MVVM, Room, recursos nativos y datos ficticios de EP2/EP3.
+- `Guia_Proyecto_WIM100.docx`: explicación del proyecto docente, utilizada como referencia de organización; sus rutas y reglas antiguas no sustituyen las del código del equipo.
+- [Trello del proyecto](https://trello.com/b/LbivxLP3/wim100-desarrollo-y-entrega).
+
+La guía propone Spring Boot 3; este repositorio backend declara 4.1.2 y Java 17. Se documenta la versión real sin cambiar dependencias. El equipo utiliza una evaluación por candidata, frente a las dos del proyecto docente original.
